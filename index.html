@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.1.1</title>
+<title>SNOWSCAPE v0.1.2</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -42,6 +42,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .opt{background:var(--bg);border:2px solid var(--bd);border-radius:12px;padding:10px 12px;text-align:left}
 .opt small{display:block;color:var(--sub);font-size:12px}
 .opt:hover{border-color:var(--acc)}
+.grid.m{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.grid.m .opt small{white-space:pre-line;line-height:1.5;margin-top:4px}
 .opt.sel{border-color:var(--main);background:color-mix(in srgb,var(--main) 14%,var(--card));font-weight:700}
 .opt.sel::after{content:" ✓";color:var(--main)}
 input[type=text]{width:100%;font:inherit;padding:11px 12px;border-radius:12px;border:2px solid var(--bd);background:var(--bg);color:var(--tx);margin-top:8px}
@@ -114,7 +116,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.1.1</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.1.2</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -146,7 +148,12 @@ const $=s=>document.querySelector(s);
 const E=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const SK="snowscape_save_v1",STK="snowscape_settings_v1";
 /* ---- data (山名は実在の山を参考にした候補。地形・条件はすべてゲーム内の架空設定) ---- */
-const REG={"北海道":["羊蹄山周辺","大雪山","夕張岳","手稲山"],"東北":["蔵王連峰","八甲田山","八幡平","磐梯山"],"関東":["谷川岳","草津白根山","武尊山","皇海山"],"甲信越":["白馬岳","志賀高原","妙高山","八ヶ岳"],"北陸":["白山","立山","荒島岳"],"東海":["御嶽山","乗鞍岳","鷲ヶ岳"],"近畿":["伊吹山","六甲山","氷ノ山"],"中国":["大山","恐羅漢山","蒜山"],"四国":["石鎚山","剣山","三嶺"],"九州":["九重山","阿蘇山","雲仙岳"]};
+const REG={"北海道":["ニセコ・羊蹄山周辺","ルスツ周辺","富良野周辺","手稲山周辺","大雪山周辺"],"東北":["蔵王連峰","八甲田山周辺","安比高原周辺","八幡平周辺","磐梯山周辺"],"関東":["丸沼高原周辺","谷川岳周辺","武尊山周辺"],"甲信越":["白馬山麓","志賀高原","妙高山周辺","野沢温泉周辺","苗場山周辺"],"北陸":["立山山麓","白山山麓","奥越・荒島岳周辺"],"東海":["御嶽山周辺","乗鞍岳周辺","鷲ヶ岳周辺"],"近畿":["氷ノ山周辺","奥伊吹・伊吹山周辺"],"中国":["大山周辺","恐羅漢山周辺"],"四国":["石鎚山周辺"],"九州":["九重連山周辺"]};
+/* 山の説明: [標高の目安, 降雪・積雪の特徴, 開発難度1-5]。標高は目安、他はゲーム内設定 */
+const MI={"ニセコ・羊蹄山周辺":["羊蹄山 1,898m","日本海側の豪雪地帯。軽いパウダースノー",2],"ルスツ周辺":["スキー場最高部 約1,000m","羊蹄山麓の多雪地。標高は控えめ",2],"富良野周辺":["十勝岳 2,077m","内陸の寒冷地。乾いた雪で降雪量は日本海側より少なめ",2],"手稲山周辺":["手稲山 1,023m","札幌近郊の多雪地。標高の割に積雪が豊富",2],"大雪山周辺":["旭岳 2,291m","厳寒で雪が長く残る。国立公園で開発制約が大きい",5],"蔵王連峰":["熊野岳 1,841m","樹氷で知られる多雪地。高標高の斜面を使える",3],"八甲田山周辺":["大岳 1,585m","世界有数の豪雪地帯。国立公園で開発制約あり",4],"安比高原周辺":["スキー場最高部 約1,300m","岩手県北部の多雪地。大規模リゾート向き",2],"八幡平周辺":["八幡平 1,613m","岩手・秋田県境の寒冷多雪地。国立公園の制約あり",4],"磐梯山周辺":["磐梯山 1,816m","会津・裏磐梯側は多雪。周辺に複数のスキー場",3],"丸沼高原周辺":["日光白根山 2,578m","高標高で寒冷。乾いた雪質、降雪量は中程度",3],"谷川岳周辺":["谷川岳 1,977m","上越国境の豪雪地帯。急峻で上級向け地形が多い",4],"武尊山周辺":["武尊山 2,158m","群馬県北部の多雪・高標高地。雪質が良い",3],"白馬山麓":["白馬岳 2,932m","北アルプス山麓の多雪地。複数エリアを連携しやすい",3],"志賀高原":["横手山 2,307m","高標高でシーズンが長い。広大な地形",3],"妙高山周辺":["妙高山 2,454m","日本有数の豪雪地帯。積雪が非常に多い",3],"野沢温泉周辺":["毛無山 1,650m","豪雪の飯山・野沢地域。温泉街と一体で開発しやすい",2],"苗場山周辺":["苗場山 2,145m","新潟県境の豪雪地帯。大規模スキー場が集まる",3],"立山山麓":["立山(大汝山) 3,015m","世界有数の豪雪地帯。国立公園で山麓の低標高側が前提",5],"白山山麓":["白山 2,702m","石川・岐阜の豪雪地帯。山麓に複数のスキー場",4],"奥越・荒島岳周辺":["荒島岳 1,523m","福井県奥越の豪雪地帯。標高は控えめだが積雪量は多い",3],"御嶽山周辺":["御嶽山 3,067m","高標高で寒冷。活火山で防災上の制約に注意",4],"乗鞍岳周辺":["乗鞍岳 3,026m","高標高で寒冷。岐阜・長野県境で国立公園の制約あり",4],"鷲ヶ岳周辺":["鷲ヶ岳 約1,670m","岐阜県北部の多雪地。中規模リゾート向き",2],"氷ノ山周辺":["氷ノ山 1,510m","兵庫県最高峰。近畿では有数の多雪地",3],"奥伊吹・伊吹山周辺":["伊吹山 1,377m","1927年の観測史上最深積雪の記録が残る多雪地。標高が低く暖冬に弱い",3],"大山周辺":["大山 1,729m","日本海側の多雪地。山頂部は国立公園",3],"恐羅漢山周辺":["恐羅漢山 1,346m","広島県最高峰。天然雪主体だが標高が低く暖冬に弱い",3],"石鎚山周辺":["石鎚山 1,982m","西日本最高峰。降雪は少なめで人工雪が前提",5],"九重連山周辺":["中岳 1,791m","九州本土最高峰。降雪は不安定で人工雪が前提",5]};
+/* 旧候補名 → 新候補名("X"→"X周辺"は自動対応) */
+const MAP_OLD={"羊蹄山周辺":"ニセコ・羊蹄山周辺","白馬岳":"白馬山麓","立山":"立山山麓","白山":"白山山麓","荒島岳":"奥越・荒島岳周辺","伊吹山":"奥伊吹・伊吹山周辺","九重山":"九重連山周辺"};
+const mi=m=>{const d=MI[m];return d?"標高: "+d[0]+"\n"+d[1]+"\n開発難度: "+"★".repeat(d[2])+"☆".repeat(5-d[2]):""};
 const DIFF={EASY:{funds:500e6,d:"初期資金 ¥500,000,000"},NORMAL:{funds:300e6,d:"初期資金 ¥300,000,000"},HARD:{funds:150e6,d:"初期資金 ¥150,000,000"}};
 const NAV=[["dash","📊","DASHBOARD"],["map","🗺️","MOUNTAIN MAP","山岳マップと土地取得","v0.2〜"],["build","🏗️","CONSTRUCTION","ゲレンデ・リフトの建設","v0.3〜"],["fac","🏨","FACILITIES","ホテル・レストラン・レンタル施設","v0.4〜"],["fin","💴","FINANCE","収支・借入・返済・チケット料金","v0.5〜"],["staff","👥","STAFF","従業員の雇用と管理","v0.6〜"],["wx","🌨️","WEATHER","降雪・積雪・気温・雪質、スノーマシン","v0.7〜"],["rep","📄","REPORTS","経営レポートとCPU企業との比較","v0.8〜"]];
 const WD="日月火水木金土";
@@ -166,9 +173,9 @@ function fmtDate(s){const d=new Date(s+"T00:00:00Z");return d.getUTCFullYear()+"
 /* ---- save / load ---- */
 function realDate(s){if(typeof s!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+"T00:00:00Z");return !isNaN(d)&&d.toISOString().slice(0,10)===s}
 const has=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
-function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&REG[o.region].includes(o.mountain)&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100}
+function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&typeof o.mountain==="string"&&o.mountain!==""&&o.mountain.length<=40&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100}
 function saveGame(quiet){if(!G)return;G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};const ok=lsSet(SK,JSON.stringify(G));if(!quiet)toast(ok?"セーブしました":"セーブに失敗しました(ブラウザの保存領域を確認してください)");refreshTitle();return ok}
-function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;return{data:o}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
+function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}return{data:o,note}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
 function refreshTitle(){$("#bc").disabled=!lsGet(SK);$("#tn").textContent=""}
 /* ---- new game ---- */
 function newState(){N={region:"北海道",mt:REG["北海道"][0],diff:"NORMAL",rival:true,name:""}}
@@ -176,7 +183,7 @@ function opts(list,cur,act){return list.map(([v,l,s])=>'<button class="opt'+(v==
 function rNew(){
  $("#new").innerHTML='<div class="wrap"><h2>NEW GAME</h2>'+
  '<div class="card"><h3>1 / 山岳エリア</h3><div class="grid">'+opts(Object.keys(REG).map(k=>[k,k]),N.region,"reg")+'</div></div>'+
- '<div class="card"><h3>2 / 開発対象の山</h3><div class="note">実在の山を参考にした候補です。地形・積雪・開発条件はすべてゲーム内の架空設定で、実際の情報ではありません。</div><div class="grid">'+opts(REG[N.region].map(m=>[m,m]),N.mt,"mt")+'</div></div>'+
+ '<div class="card"><h3>2 / 開発対象の山</h3><div class="note">実在の山を参考にした候補です。地形・積雪・開発条件はすべてゲーム内の架空設定で、実際の情報ではありません。標高は目安で、降雪・積雪の特徴や開発難度は地域特性を参考にしたゲーム内設定です。実際の気象や開発の可否を保証するものではありません。</div><div class="grid m">'+opts(REG[N.region].map(m=>[m,m,mi(m)]),N.mt,"mt")+'</div></div>'+
  '<div class="card"><h3>3 / 難易度</h3><div class="grid">'+opts(Object.entries(DIFF).map(([k,v])=>[k,k,v.d]),N.diff,"diff")+'</div></div>'+
  '<div class="card"><h3>4 / CPUライバル</h3><div class="grid">'+opts([["1","ON","CPU企業が存在する"],["0","OFF","CPU企業なし"]],N.rival?"1":"0","rival")+'</div><div class="note" style="margin-top:8px">※v0.1では設定の保存と表示のみで、CPU企業はまだ動作しません。</div></div>'+
  '<div class="card"><h3>5 / スキー場名</h3><input type="text" id="nm" maxlength="24" placeholder="例: スノースケープ高原リゾート" value="'+E(N.name)+'" autocomplete="off"><div class="hint" id="nh"></div></div></div>'+
@@ -227,9 +234,9 @@ document.addEventListener("click",ev=>{
   case"start":{const nm=N.name.trim();if(!nm){chkName();return}
    G={ver:1,name:nm,region:N.region,mountain:N.mt,diff:N.diff,rival:N.rival,funds:DIFF[N.diff].funds,date:"2026-11-01",day:1,phase:"開業準備中",reputation:50};
    saveGame(true);enterGame();toast("開発を開始しました");break}
-  case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast("ロードしました");break}
+  case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.1.1</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.1.2</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
