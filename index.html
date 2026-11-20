@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SNOWSCAPE v0.1</title>
+<style>
+:root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.6 "Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif;min-height:100dvh}
+button{font:inherit;color:inherit;cursor:pointer}
+.scr{display:none}.scr.on{display:block}
+.btn{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 18px;font-weight:600;transition:.15s}
+.btn:hover:not(:disabled){border-color:var(--main);transform:translateY(-1px)}
+.btn:active:not(:disabled){transform:translateY(1px) scale(.98)}
+.btn.p{background:var(--main);color:var(--on);border-color:var(--main)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,.opt:focus-visible,.ni:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+/* title */
+#title{min-height:100dvh;position:relative;overflow:hidden;background:linear-gradient(#0f2740,#2a6a94 55%,#a9d9ee);color:#fff;text-align:center}
+#title svg.mt{position:absolute;left:0;bottom:0;width:100%;height:55%}
+.fl{position:absolute;top:-10px;width:6px;height:6px;border-radius:50%;background:#fff;opacity:.8;animation:fall linear infinite}
+@keyframes fall{to{transform:translateY(110vh)}}
+@media (prefers-reduced-motion:reduce){.fl{animation:none;top:30%}}
+.tc{position:relative;z-index:2;padding:12dvh 20px 40px}
+.tc h1{font-size:clamp(38px,9vw,76px);letter-spacing:.14em;margin:0;text-shadow:0 4px 24px rgba(0,0,0,.35)}
+.tc p{margin:6px 0 34px;letter-spacing:.3em;font-size:13px;opacity:.9}
+.tm{display:flex;flex-direction:column;gap:12px;max-width:300px;margin:0 auto}
+.tm .btn{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.4);backdrop-filter:blur(6px);letter-spacing:.12em;padding:13px}
+.tm .btn:hover:not(:disabled){background:rgba(255,255,255,.28)}
+.tm .btn.p{background:#fff;color:#183247}
+.tn{margin-top:14px;font-size:13px;min-height:20px;background:rgba(0,0,0,.25);display:inline-block;padding:2px 12px;border-radius:99px}
+.tn:empty{display:none}
+/* new */
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 110px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:18px;margin-bottom:16px}
+.card h3{margin:0 0 4px;font-size:13px;letter-spacing:.12em;color:var(--main)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+.opt{background:var(--bg);border:2px solid var(--bd);border-radius:12px;padding:10px 12px;text-align:left}
+.opt small{display:block;color:var(--sub);font-size:12px}
+.opt:hover{border-color:var(--acc)}
+.opt.sel{border-color:var(--main);background:color-mix(in srgb,var(--main) 14%,var(--card));font-weight:700}
+.opt.sel::after{content:" ✓";color:var(--main)}
+input[type=text]{width:100%;font:inherit;padding:11px 12px;border-radius:12px;border:2px solid var(--bd);background:var(--bg);color:var(--tx);margin-top:8px}
+input[type=text]:focus{outline:none;border-color:var(--main)}
+.hint{font-size:13px;color:var(--sub);margin-top:6px}.hint.err{color:#d2503c}
+.note{font-size:12px;color:var(--sub)}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;justify-content:center;z-index:5}
+/* game */
+#game.on{display:block}
+.hd{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--card);border-bottom:1px solid var(--bd);padding:10px 16px}
+.logo{font-weight:800;letter-spacing:.14em;color:var(--main)}
+.rn{font-weight:700;flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs{display:flex;gap:16px;font-variant-numeric:tabular-nums;font-weight:600;flex-wrap:wrap}
+.hs span small{display:block;font-size:10px;color:var(--sub);letter-spacing:.1em;line-height:1.2}
+.body{display:grid;grid-template-columns:210px 1fr;align-items:start}
+nav{position:sticky;top:64px;padding:14px 10px;display:flex;flex-direction:column;gap:4px}
+.ni{display:flex;gap:10px;align-items:center;background:none;border:0;border-left:4px solid transparent;border-radius:10px;padding:10px 12px;text-align:left;font-size:13px;font-weight:600;letter-spacing:.06em;color:var(--sub)}
+.ni:hover{background:var(--card)}
+.ni.on{background:var(--card);border-left-color:var(--main);color:var(--main)}
+.ni i{font-style:normal;font-size:18px}
+.ns{margin-top:12px;border-top:1px solid var(--bd);padding-top:8px}
+main{padding:20px 16px 40px;min-width:0}
+main h2{margin:0 0 14px;font-size:20px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.k{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px}
+.k small{color:var(--sub);font-size:11px;letter-spacing:.1em}
+.k b{display:block;font-size:22px;font-variant-numeric:tabular-nums;margin-top:2px}
+.tag{font-size:10px;background:var(--bd);color:var(--sub);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+.map{min-height:300px;border-radius:var(--r);border:2px dashed var(--bd);background:linear-gradient(var(--card),var(--bg));display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--sub)}
+.map svg{width:min(320px,70%);height:auto}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{color:var(--sub)}dd{margin:0;font-weight:600}
+.wip{text-align:center;padding:40px 16px}.wip .ic{font-size:44px}
+.bd{display:inline-block;background:var(--acc);color:#0B1A26;border-radius:99px;padding:2px 12px;font-size:12px;font-weight:700}
+/* modal & toast */
+.ov{position:fixed;inset:0;background:rgba(10,25,40,.55);z-index:20;display:flex;align-items:center;justify-content:center;padding:16px}
+.ov[hidden]{display:none}
+.md{background:var(--card);border-radius:18px;padding:22px;max-width:440px;width:100%;max-height:90dvh;overflow:auto;border:1px solid var(--bd)}
+.md h2{margin-top:0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bd)}
+.seg{display:flex;gap:6px}.seg .btn{padding:6px 12px}.seg .btn.on{background:var(--main);color:var(--on);border-color:var(--main)}
+#toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:9px 18px;border-radius:99px;z-index:30;font-size:14px;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+@media (max-width:800px){
+ .body{display:block}
+ nav{position:fixed;top:auto;bottom:0;left:0;right:0;z-index:7;flex-direction:row;overflow-x:auto;background:var(--card);border-top:1px solid var(--bd);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));gap:2px}
+ .ni{flex-direction:column;gap:0;border-left:0;border-top:3px solid transparent;font-size:9px;padding:4px 8px;min-width:68px;text-align:center;letter-spacing:0}
+ .ni.on{border-top-color:var(--main)}
+ .ns{margin:0;border:0;padding:0;display:contents}
+ main{padding-bottom:96px}
+ .hs{gap:10px;font-size:13px}.logo{font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<div id="title" class="scr on">
+ <svg class="mt" viewBox="0 0 800 300" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+  <polygon points="0,300 0,180 120,90 200,150 330,50 470,170 560,110 700,190 800,130 800,300" fill="#5b8fb0" opacity=".6"/>
+  <polygon points="330,50 300,85 330,78 350,95 372,75" fill="#fff" opacity=".9"/>
+  <polygon points="0,300 0,230 150,140 260,220 400,120 540,230 650,160 800,240 800,300" fill="#e9f5fb"/>
+  <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
+ </svg>
+ <div class="tc">
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT</p>
+  <div class="tm">
+   <button class="btn p" data-a="new">NEW GAME</button>
+   <button class="btn" id="bc" data-a="cont">CONTINUE</button>
+   <button class="btn" data-a="set">SETTINGS</button>
+   <button class="btn" data-a="cred">CREDITS</button>
+  </div>
+  <div class="tn" id="tn"></div>
+ </div>
+</div>
+
+<div id="new" class="scr"></div>
+
+<div id="game" class="scr">
+ <header class="hd">
+  <div class="logo">❄ SNOWSCAPE</div>
+  <div class="rn" id="hn"></div>
+  <div class="hs"><span><small>DATE</small><b id="hdt"></b></span><span><small>FUNDS</small><b id="hf"></b></span></div>
+  <button class="btn p" data-a="next">NEXT DAY ▶</button>
+ </header>
+ <div class="body"><nav id="nav" aria-label="メインメニュー"></nav><main id="main"></main></div>
+</div>
+
+<div id="modal" class="ov" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const E=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SK="snowscape_save_v1",STK="snowscape_settings_v1";
+/* ---- data (山名は実在の山を参考にした候補。地形・条件はすべてゲーム内の架空設定) ---- */
+const REG={"北海道":["羊蹄山周辺","大雪山","夕張岳","手稲山"],"東北":["蔵王連峰","八甲田山","八幡平","磐梯山"],"関東":["谷川岳","草津白根山","武尊山","皇海山"],"甲信越":["白馬岳","志賀高原","妙高山","八ヶ岳"],"北陸":["白山","立山","荒島岳"],"東海":["御嶽山","乗鞍岳","鷲ヶ岳"],"近畿":["伊吹山","六甲山","氷ノ山"],"中国":["大山","恐羅漢山","蒜山"],"四国":["石鎚山","剣山","三嶺"],"九州":["九重山","阿蘇山","雲仙岳"]};
+const DIFF={EASY:{funds:500e6,d:"初期資金 ¥500,000,000"},NORMAL:{funds:300e6,d:"初期資金 ¥300,000,000"},HARD:{funds:150e6,d:"初期資金 ¥150,000,000"}};
+const NAV=[["dash","📊","DASHBOARD"],["map","🗺️","MOUNTAIN MAP","山岳マップと土地取得","v0.2〜"],["build","🏗️","CONSTRUCTION","ゲレンデ・リフトの建設","v0.3〜"],["fac","🏨","FACILITIES","ホテル・レストラン・レンタル施設","v0.4〜"],["fin","💴","FINANCE","収支・借入・返済・チケット料金","v0.5〜"],["staff","👥","STAFF","従業員の雇用と管理","v0.6〜"],["wx","🌨️","WEATHER","降雪・積雪・気温・雪質、スノーマシン","v0.7〜"],["rep","📄","REPORTS","経営レポートとCPU企業との比較","v0.8〜"]];
+const WD="日月火水木金土";
+/* ---- state ---- */
+let ST={theme:null,sfx:true,vol:60},G=null,N={},view="dash";
+function lsGet(k){try{return localStorage.getItem(k)}catch(_){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v);return true}catch(_){return false}}
+function loadST(){try{const o=JSON.parse(lsGet(STK)||"null");if(o&&typeof o==="object"){if(o.theme==="light"||o.theme==="dark")ST.theme=o.theme;if(typeof o.sfx==="boolean")ST.sfx=o.sfx;if(Number.isFinite(o.vol))ST.vol=Math.min(100,Math.max(0,o.vol))}}catch(_){}applyTheme()}
+function saveST(){lsSet(STK,JSON.stringify(ST))}
+function applyTheme(){const t=ST.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.dataset.theme=t}
+/* ---- helpers ---- */
+let tt;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("on"),2600)}
+function show(id){document.querySelectorAll(".scr").forEach(s=>s.classList.toggle("on",s.id===id));scrollTo(0,0)}
+let ac;function beep(){if(!ST.sfx||!ST.vol)return;try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=660;g.gain.value=ST.vol/100*.12;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.06)}catch(_){}}
+const yen=n=>"¥"+Number(n).toLocaleString("ja-JP");
+function fmtDate(s){const d=new Date(s+"T00:00:00Z");return d.getUTCFullYear()+"年"+(d.getUTCMonth()+1)+"月"+d.getUTCDate()+"日("+WD[d.getUTCDay()]+")"}
+/* ---- save / load ---- */
+function validSave(o){return o&&typeof o.name==="string"&&o.name&&REG[o.region]&&typeof o.mountain==="string"&&DIFF[o.diff]&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&/^\d{4}-\d{2}-\d{2}$/.test(o.date)&&Number.isFinite(o.day)&&typeof o.phase==="string"}
+function saveGame(quiet){if(!G)return;G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};const ok=lsSet(SK,JSON.stringify(G));if(!quiet)toast(ok?"セーブしました":"セーブに失敗しました(ブラウザの保存領域を確認してください)");refreshTitle();return ok}
+function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(!validSave(o))throw 0;return{data:o}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
+function refreshTitle(){$("#bc").disabled=!lsGet(SK);$("#tn").textContent=""}
+/* ---- new game ---- */
+function newState(){N={region:"北海道",mt:REG["北海道"][0],diff:"NORMAL",rival:true,name:""}}
+function opts(list,cur,act){return list.map(([v,l,s])=>'<button class="opt'+(v===cur?" sel":"")+'" data-a="'+act+'" data-v="'+E(v)+'" aria-pressed="'+(v===cur)+'">'+E(l)+(s?"<small>"+E(s)+"</small>":"")+"</button>").join("")}
+function rNew(){
+ $("#new").innerHTML='<div class="wrap"><h2>NEW GAME</h2>'+
+ '<div class="card"><h3>1 / 山岳エリア</h3><div class="grid">'+opts(Object.keys(REG).map(k=>[k,k]),N.region,"reg")+'</div></div>'+
+ '<div class="card"><h3>2 / 開発対象の山</h3><div class="note">実在の山を参考にした候補です。地形・積雪・開発条件はすべてゲーム内の架空設定で、実際の情報ではありません。</div><div class="grid">'+opts(REG[N.region].map(m=>[m,m]),N.mt,"mt")+'</div></div>'+
+ '<div class="card"><h3>3 / 難易度</h3><div class="grid">'+opts(Object.entries(DIFF).map(([k,v])=>[k,k,v.d]),N.diff,"diff")+'</div></div>'+
+ '<div class="card"><h3>4 / CPUライバル</h3><div class="grid">'+opts([["1","ON","CPU企業が存在する"],["0","OFF","CPU企業なし"]],N.rival?"1":"0","rival")+'</div><div class="note" style="margin-top:8px">※v0.1では設定の保存と表示のみで、CPU企業はまだ動作しません。</div></div>'+
+ '<div class="card"><h3>5 / スキー場名</h3><input type="text" id="nm" maxlength="24" placeholder="例: スノースケープ高原リゾート" value="'+E(N.name)+'" autocomplete="off"><div class="hint" id="nh"></div></div></div>'+
+ '<div class="bar"><button class="btn" data-a="back">← 戻る</button><button class="btn p" id="bs" data-a="start">ゲーム開始 ▶</button></div>';
+ $("#nm").addEventListener("input",e=>{N.name=e.target.value;chkName()});chkName()}
+function chkName(){const ok=N.name.trim().length>0;$("#bs").disabled=!ok;const h=$("#nh");h.textContent=ok?"この名前で開発を始めます。":"スキー場名を入力してください(未入力ではゲームを開始できません)。";h.classList.toggle("err",!ok)}
+/* ---- daily processing (将来: 来場者・売上・維持費・天候はここへ追加) ---- */
+const DAILY=[]; // 関数 (g)=>void を登録する
+function advanceDay(g){const d=new Date(g.date+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+1);g.date=d.toISOString().slice(0,10);g.day+=1;DAILY.forEach(f=>f(g))}
+/* ---- game screen ---- */
+function enterGame(){show("game");view="dash";$("#hn").textContent=G.name;$("#nav").innerHTML=NAV.map(n=>'<button class="ni" data-a="nav" data-v="'+n[0]+'"><i>'+n[1]+"</i><span>"+n[2]+"</span></button>").join("")+'<div class="ns"><button class="ni" data-a="save"><i>💾</i><span>SAVE</span></button><button class="ni" data-a="title"><i>🏠</i><span>TITLE</span></button></div>';upd()}
+function upd(){$("#hdt").textContent=fmtDate(G.date);$("#hf").textContent=yen(G.funds);document.querySelectorAll(".ni[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===view));renderView()}
+function renderView(){
+ const m=$("#main");
+ if(view==="dash"){
+  m.innerHTML='<h2>DASHBOARD</h2><div class="cards">'+
+  '<div class="k"><small>総資金</small><b>'+yen(G.funds)+'</b></div>'+
+  '<div class="k"><small>来場者数</small><b>0 人</b></div>'+
+  '<div class="k"><small>営業状況</small><b>'+E(G.phase)+'</b></div>'+
+  '<div class="k"><small>積雪量<span class="tag">仮値</span></small><b>0 cm</b></div>'+
+  '<div class="k"><small>天候<span class="tag">仮値</span></small><b>☀ 晴れ</b></div>'+
+  '<div class="k"><small>評判</small><b>'+G.reputation+' / 100</b></div></div>'+
+  '<div class="map"><svg viewBox="0 0 320 150" aria-hidden="true"><polygon points="0,150 60,60 100,95 170,15 250,100 285,70 320,150" fill="currentColor" opacity=".25"/><polygon points="170,15 150,42 170,36 185,48 200,34" fill="currentColor" opacity=".5"/></svg><b style="color:var(--tx);font-size:18px">'+E(G.mountain)+'('+E(G.region)+')</b><span>山岳マップ表示エリア — v0.2以降で実装予定</span></div>'+
+  '<div class="card" style="margin-top:16px"><h3>GAME INFO</h3><dl><dt>難易度</dt><dd>'+G.diff+'</dd><dt>CPUライバル</dt><dd>'+(G.rival?"ON(v0.1では未稼働)":"OFF")+'</dd><dt>経過日数</dt><dd>'+G.day+' 日目</dd></dl></div>';
+  return}
+ const n=NAV.find(x=>x[0]===view);
+ m.innerHTML='<h2>'+n[2]+'</h2><div class="card wip"><div class="ic">'+n[1]+'</div><h3 style="font-size:18px;color:var(--tx)">この機能は現在未実装です</h3><p><b>'+E(n[3])+'</b> は今後のアップデートで追加予定です。</p><span class="bd">予定: '+n[4]+'</span><p class="note">v0.1ではゲーム開始・設定・日付進行・セーブ/ロードの基盤のみ実装しています。</p></div>'}
+/* ---- modal ---- */
+function modal(h){const o=$("#modal");o.innerHTML='<div class="md" role="dialog" aria-modal="true">'+h+'<div style="text-align:right;margin-top:14px"><button class="btn p" data-a="close">閉じる</button></div></div>';o.hidden=false}
+function rSet(){modal('<h2>SETTINGS</h2>'+
+ '<div class="row"><span>表示モード</span><div class="seg"><button class="btn'+(document.documentElement.dataset.theme==="light"?" on":"")+'" data-a="th" data-v="light">LIGHT</button><button class="btn'+(document.documentElement.dataset.theme==="dark"?" on":"")+'" data-a="th" data-v="dark">DARK</button></div></div>'+
+ '<div class="row"><span>BGM <span class="tag">未実装</span></span><span class="note">v0.2以降で対応予定</span></div>'+
+ '<div class="row"><span>効果音</span><div class="seg"><button class="btn'+(ST.sfx?" on":"")+'" data-a="sfx" data-v="1">ON</button><button class="btn'+(!ST.sfx?" on":"")+'" data-a="sfx" data-v="0">OFF</button></div></div>'+
+ '<div class="row"><span>音量(効果音)</span><span><input type="range" id="vol" min="0" max="100" value="'+ST.vol+'" aria-label="音量"> <b id="vl">'+ST.vol+'</b></span></div>')}
+/* ---- events ---- */
+document.addEventListener("click",ev=>{
+ const b=ev.target.closest("[data-a]");
+ if(ev.target.id==="modal"){$("#modal").hidden=true;return}
+ if(!b||b.disabled)return;beep();
+ const a=b.dataset.a,v=b.dataset.v;
+ switch(a){
+  case"new":newState();rNew();show("new");break;
+  case"back":refreshTitle();show("title");break;
+  case"reg":N.region=v;N.mt=REG[v][0];rNew();break;
+  case"mt":N.mt=v;rNew();break;
+  case"diff":N.diff=v;rNew();break;
+  case"rival":N.rival=v==="1";rNew();break;
+  case"start":{const nm=N.name.trim();if(!nm){chkName();return}
+   G={ver:1,name:nm,region:N.region,mountain:N.mt,diff:N.diff,rival:N.rival,funds:DIFF[N.diff].funds,date:"2026-11-01",day:1,phase:"開業準備中",reputation:50};
+   saveGame(true);enterGame();toast("開発を開始しました");break}
+  case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast("ロードしました");break}
+  case"set":rSet();break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.1</b><br>スキーリゾート開発・経営シミュレーション</p><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"close":$("#modal").hidden=true;break;
+  case"th":ST.theme=v;applyTheme();saveST();rSet();break;
+  case"sfx":ST.sfx=v==="1";saveST();rSet();break;
+  case"nav":view=v;upd();break;
+  case"next":advanceDay(G);saveGame(true);upd();break;
+  case"save":saveGame();break;
+  case"title":saveGame(true);G=null;refreshTitle();show("title");break;
+ }
+});
+document.addEventListener("input",e=>{if(e.target.id==="vol"){ST.vol=+e.target.value;$("#vl").textContent=ST.vol;saveST()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("#modal").hidden=true});
+/* ---- init ---- */
+(function(){
+ const t=$("#title");
+ for(let i=0;i<28;i++){const f=document.createElement("i");f.className="fl";f.style.left=Math.random()*100+"%";f.style.animationDuration=(6+Math.random()*8)+"s";f.style.animationDelay=(-Math.random()*10)+"s";f.style.width=f.style.height=(3+Math.random()*4)+"px";t.appendChild(f)}
+ loadST();refreshTitle();
+})();
+</script>
+</body>
+</html>
