@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.1.2.1</title>
+<title>SNOWSCAPE v0.1.3</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -116,7 +116,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.1.2.1</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.1.3</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -207,8 +207,8 @@ function fmtDate(s){const d=new Date(s+"T00:00:00Z");return d.getUTCFullYear()+"
 function realDate(s){if(typeof s!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+"T00:00:00Z");return !isNaN(d)&&d.toISOString().slice(0,10)===s}
 const has=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&typeof o.mountain==="string"&&o.mountain!==""&&o.mountain.length<=40&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100}
-function saveGame(quiet){if(!G)return;G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};const ok=lsSet(SK,JSON.stringify(G));if(!quiet)toast(ok?"セーブしました":"セーブに失敗しました(ブラウザの保存領域を確認してください)");refreshTitle();return ok}
-function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}return{data:o,note}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
+function saveGame(quiet){if(!G)return;G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};const ok=lsSet(SK,JSON.stringify(G));if(!ok)toast("セーブに失敗しました(ブラウザの保存領域を確認してください)");else if(!quiet)toast("セーブしました");refreshTitle();return ok}
+function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}return{data:o,note}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
 function refreshTitle(){$("#bc").disabled=!lsGet(SK);$("#tn").textContent=""}
 /* ---- new game ---- */
 function newState(){N={region:"北海道",mt:REG["北海道"][0],diff:"NORMAL",rival:true,name:""}}
@@ -226,6 +226,46 @@ function chkName(){const ok=N.name.trim().length>0;$("#bs").disabled=!ok;const h
 /* ---- daily processing (将来: 来場者・売上・維持費・天候はここへ追加) ---- */
 const DAILY=[]; // 関数 (g)=>void を登録する
 function advanceDay(g){const d=new Date(g.date+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+1);g.date=d.toISOString().slice(0,10);g.day+=1;DAILY.forEach(f=>f(g))}
+/* ---- v0.1.3 日次の山岳コンディション(ゲーム内の架空シミュレーション。実在の気象データではない) ---- */
+/* CL[地域]=[年平均気温(標高1,000m基準), 冬の降水日確率, 積雪ピークの目安cm]。山ごとの標高・多雪度はMJ/MIの表示値から補正 */
+const CL={"北海道":[5,.55,120],"東北":[6,.5,110],"関東":[7,.3,60],"甲信越":[6,.5,130],"北陸":[7,.55,150],"東海":[7,.3,50],"近畿":[9,.35,50],"中国":[9,.3,40],"四国":[10,.15,15],"九州":[10.5,.12,10]};
+const WXN=["晴れ","曇り","雪","大雪","みぞれ","雨","吹雪"],CN=["EXCELLENT","GOOD","FAIR","POOR","CLOSED"];
+const CJ={EXCELLENT:"非常に良好",GOOD:"良好",FAIR:"普通",POOR:"不良",CLOSED:"営業困難"};
+const EVD={"大雪":"短時間で積雪が大きく増えました。","暖冬":"暖かい日が続き、降雪が減って積雪が融けやすくなっています。","強風":"強風が吹き荒れ、吹雪や視界不良に注意が必要です。","快晴":"雲ひとつない快晴で、朝は冷え込みました。","急激な冷え込み":"強い寒気が流れ込み、気温が急に下がりました。","気温上昇":"暖気が流れ込み、気温が急に上がりました。"};
+const rng=(v,a,b)=>typeof v==="number"&&Number.isFinite(v)&&v>=a&&v<=b;
+const gs=()=>{let s=0;for(let i=0;i<6;i++)s+=Math.random();return(s-3)*Math.SQRT2};
+const doy=s=>{const d=s.split("-").map(Number);return Math.round((Date.UTC(d[0],d[1]-1,d[2])-Date.UTC(d[0],0,0))/864e5)};
+function clim(g){const r=CL[g.region]||CL["東北"],j=MJ[g.mountain],x=j&&j.p&&/([\d,]{4,})m/.exec(j.p),el=x?+x[1].replace(/,/g,""):1000,e=Math.max(-.5,Math.min(1.5,(el-1000)/1000)),s=(MI[g.mountain]||[])[1]||"",k=/豪雪/.test(s)?1.4:/多雪/.test(s)?1.2:/少な|人工雪|不安定/.test(s)?.6:1;return{tm:r[0]-3.5*e,p:Math.min(.8,r[1]*Math.sqrt(k)*(1+.1*e)),pk:r[2]*k*(1+.2*e),k}}
+function cond(w){const d=w.depth,t=w.t,x=w.w;if(d<15)return"CLOSED";if(x==="雨"||t>=4)return"POOR";if(x==="みぞれ")return d>=60?"FAIR":"POOR";if(d<40||x==="吹雪")return"FAIR";if(d>=70&&t<=-3)return"EXCELLENT";return t>=2?"FAIR":"GOOD"}
+function pickEv(c,cw,t0){const b=()=>2+(Math.random()<.5?1:0),o=[["強風",1],["快晴",1],["急激な冷え込み",b()],["気温上昇",b()]];if(c.p>=.25&&t0<2)o.push(["大雪",1+(Math.random()<.4?1:0)]);if(cw>.3)o.push(["暖冬",4+Math.floor(Math.random()*4)]);return o[Math.floor(Math.random()*o.length)]}
+function stepWx(g,w,first){
+ const c=clim(g),cw=Math.cos(2*Math.PI*(doy(g.date)-25)/365),prev=w.depth,wasP=["雪","大雪","吹雪","みぞれ","雨"].includes(w.w);
+ w.an=.6*w.an+gs()*2.3;w.evNew=false;
+ if(first){w.ev="";w.evLeft=0}
+ else if(w.ev&&w.evLeft>0)w.evLeft--;
+ else{w.ev="";if(Math.random()<.07){const x=pickEv(c,cw,c.tm-13*cw+w.an);w.ev=x[0];w.evLeft=x[1]-1;w.evNew=true}}
+ const ev=w.ev,t0=c.tm-13*cw+w.an+(ev==="暖冬"?5:ev==="急激な冷え込み"?-7:ev==="気温上昇"?6:ev==="快晴"?-2:0);
+ let pp=c.p*(.5+.5*cw)+(wasP?.12:0);
+ if(ev==="暖冬")pp*=.45;
+ pp=Math.max(.03,Math.min(.9,pp));
+ if(ev==="大雪"&&t0<=2)pp=1;
+ if(ev==="快晴")pp=0;
+ let pr=Math.random()<pp,wn,ns=0,melt=0;
+ if(first)pr=false;
+ if(!pr)wn=ev==="快晴"||Math.random()<.45?"晴れ":"曇り";
+ else if(t0<=.5){let cm=Math.round((3+10*-Math.log(1-Math.random()))*c.k*(ev==="大雪"?2.3:1));cm=Math.max(1,Math.min(ev==="大雪"?90:60,cm));ns=cm;wn=cm>=25||ev==="大雪"?"大雪":"雪";if(t0<-2&&(ev==="強風"||(cm>=8&&Math.random()<.15)))wn="吹雪"}
+ else if(t0<=2.5){wn="みぞれ";ns=Math.floor(Math.random()*4);melt+=1}
+ else{wn="雨";melt+=2+Math.random()*4}
+ if(ev==="強風"&&!pr)wn="曇り";
+ if(t0>0)melt+=t0*1.3*(.8+Math.random()*.4);
+ if(first){ns=0;melt=0}
+ w.depth=first?prev:Math.max(0,Math.min(500,Math.round(prev+ns-melt-prev*.008)));
+ w.dd=w.depth-prev;w.w=wn;w.t=Math.round(t0)+0;w.ns=ns;w.c=cond(w)}
+function initWx(g){const c=clim(g),cw=Math.cos(2*Math.PI*(doy(g.date)-25)/365),w={w:"曇り",t:0,ns:0,depth:Math.min(500,Math.round(c.pk*Math.pow(Math.max(0,cw),1.2))),c:"CLOSED",ev:"",evLeft:0,evNew:false,an:0,dd:0};stepWx(g,w,true);return w}
+function validWx(w){return !!w&&typeof w==="object"&&WXN.includes(w.w)&&CN.includes(w.c)&&rng(w.t,-40,40)&&rng(w.ns,0,200)&&rng(w.depth,0,600)&&rng(w.dd,-600,600)&&rng(w.an,-30,30)&&Number.isInteger(w.evLeft)&&w.evLeft>=0&&w.evLeft<=14&&typeof w.ev==="string"&&(w.ev===""||has(EVD,w.ev))&&typeof w.evNew==="boolean"}
+function rReport(){const w=G.wx,dd=w.dd,ex={"雪":"雪が降り、積雪が増えました。","大雪":"大雪となり、積雪が大きく増えました。","吹雪":"強風を伴う吹雪で、視界が悪化しています。","みぞれ":"みぞれが降り、雪が重く湿っています。","雨":"雨が降り、積雪が減少しています。","晴れ":w.t<=-3?"晴れて冷え込み、雪質は保たれています。":"晴れ間が広がり、雪はやや緩んでいます。","曇り":"雲が広がり、比較的落ち着いた天候です。"}[w.w],cs={EXCELLENT:"雪質・積雪ともに非常に良好です。",GOOD:"雪質は良好です。",FAIR:"コンディションは普通です。",POOR:"雪質が悪化しています。",CLOSED:"積雪が不足しており、山岳コンディションは営業困難な水準です。"}[w.c];
+ modal('<h2>'+fmtDate(G.date)+' 山岳レポート</h2><dl><dt>天候</dt><dd>'+w.w+'</dd><dt>気温</dt><dd>'+w.t+'℃</dd><dt>降雪量</dt><dd>'+w.ns+'cm</dd><dt>積雪量</dt><dd>'+w.depth+'cm(前日比 '+(dd>=0?'+':'')+dd+'cm)</dd><dt>ゲレンデコンディション</dt><dd>'+w.c+'('+CJ[w.c]+')</dd><dt>気象イベント</dt><dd>'+(w.ev?(w.evNew?'発生: ':'継続中: ')+w.ev:'なし')+'</dd></dl><p>'+ex+(w.ev?EVD[w.ev]:'')+cs+'</p><p class="note">ゲーム内の架空シミュレーションです。CLOSEDは山岳コンディション上の評価で、施設の営業停止処理はまだ行いません。</p>')}
+DAILY.push(g=>{try{stepWx(g,g.wx)}catch(e){console.error(e)}});
 /* ---- game screen ---- */
 function enterGame(){show("game");view="dash";$("#hn").textContent=G.name;$("#nav").innerHTML=NAV.map(n=>'<button class="ni" data-a="nav" data-v="'+n[0]+'"><span>'+n[2]+"</span></button>").join("")+'<div class="ns"><button class="ni" data-a="save"><span>SAVE</span></button><button class="ni" data-a="title"><span>TITLE</span></button></div>';upd()}
 function upd(){$("#hdt").textContent=fmtDate(G.date);$("#hf").textContent=yen(G.funds);document.querySelectorAll(".ni[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===view));renderView()}
@@ -234,13 +274,13 @@ function renderView(){
  if(view==="dash"){
   m.innerHTML='<h2>DASHBOARD</h2><div class="cards">'+
   '<div class="k f"><small>総資金</small><b>'+yen(G.funds)+'</b></div>'+
-  '<div class="k"><small>来場者数</small><b>0 人</b></div>'+
+  '<div class="k"><small>来場者数</small><b>未実装</b></div>'+
   '<div class="k"><small>営業状況</small><b>'+E(G.phase)+'</b></div>'+
-  '<div class="k"><small>積雪量<span class="tag">仮値</span></small><b>0 cm</b></div>'+
-  '<div class="k"><small>天候<span class="tag">仮値</span></small><b>☀ 晴れ</b></div>'+
+  '<div class="k"><small>積雪量</small><b>'+G.wx.depth+' cm</b></div>'+
+  '<div class="k"><small>天候</small><b>'+G.wx.w+'</b></div>'+'<div class="k"><small>気温</small><b>'+G.wx.t+' ℃</b></div>'+'<div class="k"><small>降雪量</small><b>'+G.wx.ns+' cm</b></div>'+'<div class="k"><small>ゲレンデコンディション</small><b>'+G.wx.c+'</b><small>'+CJ[G.wx.c]+'</small></div>'+
   '<div class="k"><small>評判</small><b>'+G.reputation+' / 100</b></div></div>'+
   '<div class="map"><svg viewBox="0 0 320 150" aria-hidden="true"><polygon points="0,150 60,60 100,95 170,15 250,100 285,70 320,150" fill="currentColor" opacity=".25"/><polygon points="170,15 150,42 170,36 185,48 200,34" fill="currentColor" opacity=".5"/></svg><b style="color:var(--tx);font-size:18px">'+E(G.mountain)+'('+E(G.region)+')</b><span>山岳マップ表示エリア — v0.2以降で実装予定</span></div>'+
-  '<div class="card" style="margin-top:16px"><h3>GAME INFO</h3><dl><dt>難易度</dt><dd>'+G.diff+'</dd><dt>CPUライバル</dt><dd>'+(G.rival?"ON(v0.1では未稼働)":"OFF")+'</dd><dt>経過日数</dt><dd>'+G.day+' 日目</dd></dl></div>';
+  '<div class="card" style="margin-top:16px"><h3>GAME INFO</h3><dl><dt>難易度</dt><dd>'+G.diff+'</dd><dt>CPUライバル</dt><dd>'+(G.rival?"ON(v0.1では未稼働)":"OFF")+'</dd><dt>経過日数</dt><dd>'+G.day+' 日目</dd><dt>気象イベント</dt><dd>'+(G.wx.ev?G.wx.ev+(G.wx.evNew?'(発生)':'(継続中)'):'なし')+'</dd></dl><p class="note">天候・気温・積雪はゲーム内の架空シミュレーションで、実際の気象ではありません。</p></div>';
   return}
  const n=NAV.find(x=>x[0]===view);
  m.innerHTML='<h2>'+n[2]+'</h2><div class="card wip"><div class="ic">'+n[1]+'</div><h3 style="font-size:18px;color:var(--tx)">この機能は現在未実装です</h3><p><b>'+E(n[3])+'</b> は今後のアップデートで追加予定です。</p><span class="bd">予定: '+n[4]+'</span><p class="note">v0.1ではゲーム開始・設定・日付進行・セーブ/ロードの基盤のみ実装しています。</p></div>'}
@@ -265,16 +305,16 @@ document.addEventListener("click",ev=>{
   case"diff":N.diff=v;rNew();break;
   case"rival":N.rival=v==="1";rNew();break;
   case"start":{const nm=N.name.trim();if(!nm){chkName();return}
-   G={ver:1,name:nm,region:N.region,mountain:N.mt,diff:N.diff,rival:N.rival,funds:DIFF[N.diff].funds,date:"2026-11-01",day:1,phase:"開業準備中",reputation:50};
+   G={ver:2,name:nm,region:N.region,mountain:N.mt,diff:N.diff,rival:N.rival,funds:DIFF[N.diff].funds,date:"2026-11-01",day:1,phase:"開業準備中",reputation:50};G.wx=initWx(G);
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.1.2.1</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.1.3</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
   case"nav":view=v;upd();break;
-  case"next":advanceDay(G);saveGame(true);upd();break;
+  case"next":{if(!$("#modal").hidden)break;advanceDay(G);saveGame(true);upd();rReport();break}
   case"save":saveGame();break;
   case"title":saveGame(true);G=null;refreshTitle();show("title");break;
  }
