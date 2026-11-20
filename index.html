@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.1</title> 
+<title>SNOWSCAPE v0.1.1</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -29,7 +29,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .tc h1{font-size:clamp(38px,9vw,76px);letter-spacing:.14em;margin:0;text-shadow:0 4px 24px rgba(0,0,0,.35)}
 .tc p{margin:6px 0 34px;letter-spacing:.3em;font-size:13px;opacity:.9}
 .tm{display:flex;flex-direction:column;gap:12px;max-width:300px;margin:0 auto}
-.tm .btn{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.4);backdrop-filter:blur(6px);letter-spacing:.12em;padding:13px}
+.tm .btn{background:rgba(255,255,255,.14);color:#183247;border-color:rgba(255,255,255,.4);backdrop-filter:blur(6px);letter-spacing:.12em;padding:13px}
 .tm .btn:hover:not(:disabled){background:rgba(255,255,255,.28)}
 .tm .btn.p{background:#fff;color:#183247}
 .tn{margin-top:14px;font-size:13px;min-height:20px;background:rgba(0,0,0,.25);display:inline-block;padding:2px 12px;border-radius:99px}
@@ -69,6 +69,8 @@ main h2{margin:0 0 14px;font-size:20px}
 .k{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px}
 .k small{color:var(--sub);font-size:11px;letter-spacing:.1em}
 .k b{display:block;font-size:22px;font-variant-numeric:tabular-nums;margin-top:2px}
+.k.f{container-type:inline-size}
+.k.f b{font-size:16px;font-size:clamp(12px,11.5cqw,22px);white-space:nowrap}
 .tag{font-size:10px;background:var(--bd);color:var(--sub);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
 .map{min-height:300px;border-radius:var(--r);border:2px dashed var(--bd);background:linear-gradient(var(--card),var(--bg));display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--sub)}
 .map svg{width:min(320px,70%);height:auto}
@@ -80,6 +82,13 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
 .ov[hidden]{display:none}
 .md{background:var(--card);border-radius:18px;padding:22px;max-width:440px;width:100%;max-height:90dvh;overflow:auto;border:1px solid var(--bd)}
 .md h2{margin-top:0}
+.ov .md{background:var(--card);color:var(--tx)}
+.md h2,.md b,.md p,.md dd,.md span{color:var(--tx)}
+.md .note,.md dt{color:color-mix(in srgb,var(--tx) 72%,var(--card))}
+.md .btn{background:var(--card);color:var(--tx);border-color:var(--bd)}
+.md .btn.p,.md .btn.on{background:var(--main);color:var(--on);border-color:var(--main)}
+.md .tag{background:var(--bd);color:var(--tx)}
+.md input[type=range]{accent-color:var(--main)}
 .row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bd)}
 .seg{display:flex;gap:6px}.seg .btn{padding:6px 12px}.seg .btn.on{background:var(--main);color:var(--on);border-color:var(--main)}
 #toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:9px 18px;border-radius:99px;z-index:30;font-size:14px;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
@@ -87,7 +96,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
 @media (max-width:800px){
  .body{display:block}
  nav{position:fixed;top:auto;bottom:0;left:0;right:0;z-index:7;flex-direction:row;overflow-x:auto;background:var(--card);border-top:1px solid var(--bd);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));gap:2px}
- .ni{flex-direction:column;gap:0;border-left:0;border-top:3px solid transparent;font-size:9px;padding:4px 8px;min-width:68px;text-align:center;letter-spacing:0}
+ .ni{flex-direction:column;gap:0;border-left:0;border-top:3px solid transparent;font-size:11px;padding:8px 12px;min-width:0;white-space:nowrap;justify-content:center;text-align:center;letter-spacing:0}
  .ni.on{border-top-color:var(--main)}
  .ns{margin:0;border:0;padding:0;display:contents}
  main{padding-bottom:96px}
@@ -105,7 +114,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.1.1</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -155,9 +164,11 @@ let ac;function beep(){if(!ST.sfx||!ST.vol)return;try{ac=ac||new AudioContext();
 const yen=n=>"¥"+Number(n).toLocaleString("ja-JP");
 function fmtDate(s){const d=new Date(s+"T00:00:00Z");return d.getUTCFullYear()+"年"+(d.getUTCMonth()+1)+"月"+d.getUTCDate()+"日("+WD[d.getUTCDay()]+")"}
 /* ---- save / load ---- */
-function validSave(o){return o&&typeof o.name==="string"&&o.name&&REG[o.region]&&typeof o.mountain==="string"&&DIFF[o.diff]&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&/^\d{4}-\d{2}-\d{2}$/.test(o.date)&&Number.isFinite(o.day)&&typeof o.phase==="string"}
+function realDate(s){if(typeof s!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+"T00:00:00Z");return !isNaN(d)&&d.toISOString().slice(0,10)===s}
+const has=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&REG[o.region].includes(o.mountain)&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100}
 function saveGame(quiet){if(!G)return;G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};const ok=lsSet(SK,JSON.stringify(G));if(!quiet)toast(ok?"セーブしました":"セーブに失敗しました(ブラウザの保存領域を確認してください)");refreshTitle();return ok}
-function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(!validSave(o))throw 0;return{data:o}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
+function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;return{data:o}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
 function refreshTitle(){$("#bc").disabled=!lsGet(SK);$("#tn").textContent=""}
 /* ---- new game ---- */
 function newState(){N={region:"北海道",mt:REG["北海道"][0],diff:"NORMAL",rival:true,name:""}}
@@ -176,13 +187,13 @@ function chkName(){const ok=N.name.trim().length>0;$("#bs").disabled=!ok;const h
 const DAILY=[]; // 関数 (g)=>void を登録する
 function advanceDay(g){const d=new Date(g.date+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+1);g.date=d.toISOString().slice(0,10);g.day+=1;DAILY.forEach(f=>f(g))}
 /* ---- game screen ---- */
-function enterGame(){show("game");view="dash";$("#hn").textContent=G.name;$("#nav").innerHTML=NAV.map(n=>'<button class="ni" data-a="nav" data-v="'+n[0]+'"><i>'+n[1]+"</i><span>"+n[2]+"</span></button>").join("")+'<div class="ns"><button class="ni" data-a="save"><i>💾</i><span>SAVE</span></button><button class="ni" data-a="title"><i>🏠</i><span>TITLE</span></button></div>';upd()}
+function enterGame(){show("game");view="dash";$("#hn").textContent=G.name;$("#nav").innerHTML=NAV.map(n=>'<button class="ni" data-a="nav" data-v="'+n[0]+'"><span>'+n[2]+"</span></button>").join("")+'<div class="ns"><button class="ni" data-a="save"><span>SAVE</span></button><button class="ni" data-a="title"><span>TITLE</span></button></div>';upd()}
 function upd(){$("#hdt").textContent=fmtDate(G.date);$("#hf").textContent=yen(G.funds);document.querySelectorAll(".ni[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===view));renderView()}
 function renderView(){
  const m=$("#main");
  if(view==="dash"){
   m.innerHTML='<h2>DASHBOARD</h2><div class="cards">'+
-  '<div class="k"><small>総資金</small><b>'+yen(G.funds)+'</b></div>'+
+  '<div class="k f"><small>総資金</small><b>'+yen(G.funds)+'</b></div>'+
   '<div class="k"><small>来場者数</small><b>0 人</b></div>'+
   '<div class="k"><small>営業状況</small><b>'+E(G.phase)+'</b></div>'+
   '<div class="k"><small>積雪量<span class="tag">仮値</span></small><b>0 cm</b></div>'+
@@ -199,7 +210,7 @@ function rSet(){modal('<h2>SETTINGS</h2>'+
  '<div class="row"><span>表示モード</span><div class="seg"><button class="btn'+(document.documentElement.dataset.theme==="light"?" on":"")+'" data-a="th" data-v="light">LIGHT</button><button class="btn'+(document.documentElement.dataset.theme==="dark"?" on":"")+'" data-a="th" data-v="dark">DARK</button></div></div>'+
  '<div class="row"><span>BGM <span class="tag">未実装</span></span><span class="note">v0.2以降で対応予定</span></div>'+
  '<div class="row"><span>効果音</span><div class="seg"><button class="btn'+(ST.sfx?" on":"")+'" data-a="sfx" data-v="1">ON</button><button class="btn'+(!ST.sfx?" on":"")+'" data-a="sfx" data-v="0">OFF</button></div></div>'+
- '<div class="row"><span>音量(効果音)</span><span><input type="range" id="vol" min="0" max="100" value="'+ST.vol+'" aria-label="音量"> <b id="vl">'+ST.vol+'</b></span></div>')}
+ '<div class="row"><span>効果音音量</span><span><input type="range" id="vol" min="0" max="100" value="'+ST.vol+'" aria-label="音量"> <b id="vl">'+ST.vol+'</b></span></div>')}
 /* ---- events ---- */
 document.addEventListener("click",ev=>{
  const b=ev.target.closest("[data-a]");
@@ -218,7 +229,7 @@ document.addEventListener("click",ev=>{
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast("ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.1</b><br>スキーリゾート開発・経営シミュレーション</p><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.1.1</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
