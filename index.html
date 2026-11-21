@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.2.1</title>
+<title>SNOWSCAPE v0.2.1.1</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -44,8 +44,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .opt:hover{border-color:var(--acc)}
 .grid.m{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
 .grid.m .opt small{white-space:pre-line;line-height:1.5;margin-top:4px}
-.map.m3{display:block;position:relative;padding:0;overflow:hidden;border:1px solid var(--bd);height:clamp(320px,50vh,520px);touch-action:none;background:var(--card);color:var(--tx)}
-.map.m3.big{height:clamp(420px,66vh,760px)}
+.map.m3{display:block;position:relative;padding:0;overflow:hidden;border:1px solid var(--bd);height:clamp(380px,62vh,720px);touch-action:none;background:var(--card);color:var(--tx)}
+.map.m3.big{height:clamp(480px,calc(100vh - 150px),1200px);height:clamp(480px,calc(100dvh - 150px),1200px)}
+main.wide{padding:12px 10px 28px}main.wide h2{margin-bottom:10px}
+@media (max-width:800px){.map.m3.big{height:clamp(420px,calc(100vh - 250px),900px);height:clamp(420px,calc(100dvh - 250px),900px)}}
 .m3 canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
 .mh{position:absolute;left:10px;right:10px;display:flex;gap:8px;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;pointer-events:none}
 .mh.top{top:10px}.mh.bot{bottom:10px}.mh>*{pointer-events:auto}
@@ -127,7 +129,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.2.1</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.2.1.1</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -438,7 +440,7 @@ function mvInit(){
   if(!window.THREE)throw new Error('Three.jsを読み込めませんでした(ネットワークを確認してください)');
   const cv=document.createElement('canvas'),r=new THREE.WebGLRenderer({canvas:cv,antialias:true});
   r.setClearColor(0xd6e9f4);MV.cv=cv;MV.r=r;MV.sc=new THREE.Scene();MV.sc.fog=new THREE.Fog(0xd6e9f4,1100,3000);
-  MV.cam=new THREE.PerspectiveCamera(40,1,5,5000);
+  MV.cam=new THREE.PerspectiveCamera(40,1,3,5000);
   MV.sc.add(new THREE.HemisphereLight(0xffffff,0x6d7f8f,.6));
   const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(-120,160,80);MV.sc.add(dl);
   mvBind(cv);MV.ok=true;
@@ -461,10 +463,10 @@ function mvColor(depth){
  for(let j=0;j<K;j++)for(let i=0;i<K;i++){const k=j*K+i,ty=t.cellType[Math.min(j,N-1)*N+Math.min(i,N-1)],hn=(t.h[k]-t.base)/t.rel;c.setHex(TCOL[ty]);
   let f=Math.max(0,Math.min(1,(hn-hs)/.18));if(ty===3)f*=.5;if(depth<10)f=0;c.lerp(w,f);const v=.93+.14*h01(k);col.setXYZ(k,c.r*v,c.g*v,c.b*v)}
  col.needsUpdate=true}
-function mvCam(){const c=MV.cam,cp=Math.cos(MV.pitch);c.position.set(MV.tx+MV.d*cp*Math.sin(MV.yaw),30+MV.d*Math.sin(MV.pitch),MV.tz+MV.d*cp*Math.cos(MV.yaw));c.lookAt(MV.tx,30,MV.tz)}
+function mvCam(){const c=MV.cam,t=MV.t,cp=Math.cos(MV.pitch),gy=t?yOf(t,tSample(t,MV.tx,MV.tz)):30,w=Math.max(0,Math.min(1,(700-MV.d)/600)),ly=30+(gy-30)*w,cx=MV.tx+MV.d*cp*Math.sin(MV.yaw),cz=MV.tz+MV.d*cp*Math.cos(MV.yaw);let cy=ly+MV.d*Math.sin(MV.pitch);if(t)cy=Math.max(cy,yOf(t,tSample(t,cx,cz))+6);c.position.set(cx,cy,cz);c.lookAt(MV.tx,ly,MV.tz)}
 /* オンデマンド描画: 操作・リサイズ・データ更新時だけ描画し、常時ループは回さない(非表示中は描画しない) */
 function mvDraw(){if(MV.q||!MV.ok||!MV.box||!MV.box.isConnected||MV.box.offsetParent===null)return;MV.q=requestAnimationFrame(()=>{MV.q=0;try{mvCam();MV.r.render(MV.sc,MV.cam)}catch(e){console.error(e)}})}
-function mvZoom(f){MV.d=Math.max(150,Math.min(1500,MV.d*f));mvDraw()}
+function mvZoom(f){MV.d=Math.max(55,Math.min(1500,MV.d*f));mvDraw()}
 function mvPan(dx,dy){const k=MV.d*.73/Math.max(300,MV.cv.clientHeight),s=Math.sin(MV.yaw),c=Math.cos(MV.yaw),lim=(MV.t?MV.t.size:240)*.45;MV.tx=Math.max(-lim,Math.min(lim,MV.tx-c*dx*k-s*dy*k*1.26));MV.tz=Math.max(-lim,Math.min(lim,MV.tz+s*dx*k-c*dy*k*1.26));mvDraw()}
 function mvFit(){const a=MV.cam?MV.cam.aspect:1.5;MV.d=Math.min(1500,900*Math.max(1,1.15/a))}
 function mvReset(){MV.tx=0;MV.tz=0;mvFit();mvDraw()}
@@ -478,7 +480,7 @@ function mvBind(cv){
  cv.addEventListener('pointermove',e=>{const o=P.get(e.pointerId);if(!o)return;const dx=e.clientX-o[0],dy=e.clientY-o[1];P.set(e.pointerId,[e.clientX,e.clientY]);if(P.size===1)mvPan(dx,dy);else if(P.size===2){const n=pdist();if(pd>0&&n>0)mvZoom(pd/n);pd=n}});
  const up=e=>{P.delete(e.pointerId);pd=pdist();if(!P.size)cv.style.cursor='grab'};
  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
- cv.addEventListener('wheel',e=>{e.preventDefault();mvZoom(Math.exp(e.deltaY*.0012))},{passive:false});
+ cv.addEventListener('wheel',e=>{e.preventDefault();mvZoom(Math.exp((e.deltaMode===1?e.deltaY*33:e.deltaY)*.0012))},{passive:false});
  cv.addEventListener('webglcontextlost',e=>e.preventDefault());
  cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}})}
 function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button></span></div>`}
@@ -497,7 +499,7 @@ function mountMap(){
  }catch(e){console.error(e);MV.box=null;box.innerHTML=`<div class="mfb"><b style="color:var(--tx)">3Dマップの描画に失敗しました</b><span>${E(String(e&&e.message||e))}</span></div>`}}
 /* 既存の画面描画に後付け: DASHBOARDのマップ領域とMOUNTAIN MAPメニューで同じ地形を表示する */
 const _rv=renderView;
-renderView=function(){if(view==='map')$('#main').innerHTML=mapPage();else _rv();if(view==='dash'){const o=$('#main .map');if(o){o.id='mapbox';o.classList.add('m3')}}mountMap()};
+renderView=function(){$('#main').classList.toggle('wide',view==='map');if(view==='map')$('#main').innerHTML=mapPage();else _rv();if(view==='dash'){const o=$('#main .map');if(o){o.id='mapbox';o.classList.add('m3')}}mountMap()};
 const _at=applyTheme;applyTheme=function(){_at();mvTheme()};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b||!MV.ok)return;const a=b.dataset.m;if(a==='in')mvZoom(.8);else if(a==='out')mvZoom(1.25);else if(a==='reset')mvReset()});
 window.addEventListener('resize',()=>mvResize());
@@ -544,7 +546,7 @@ document.addEventListener("click",ev=>{
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.2.1</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.2.1.1</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
