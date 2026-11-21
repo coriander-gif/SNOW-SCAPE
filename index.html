@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.2.2.3</title>
+<title>SNOWSCAPE v0.3.0</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -56,6 +56,14 @@ main.wide .map.m3.big{height:max(360px,calc(100vh - var(--hh,64px) - var(--nh,0p
 .mchip{display:inline-flex;align-items:center;gap:5px;background:color-mix(in srgb,var(--card) 86%,transparent);border:1px solid var(--bd);border-radius:99px;padding:2px 9px;font-size:11px;color:var(--tx);margin:2px 3px 2px 0}
 .mchip i{width:9px;height:9px;border-radius:50%;display:inline-block;border:1px solid var(--bd)}
 .mbtn{display:flex;gap:6px}.mbtn .btn{padding:6px 12px;font-size:13px}
+.mbtn{flex-wrap:wrap;justify-content:flex-end}
+.empanel{position:absolute;top:44px;right:10px;width:250px;max-height:calc(100% - 110px);overflow:auto;background:color-mix(in srgb,var(--card) 90%,transparent);border:1px solid var(--bd);border-radius:14px;padding:10px 12px;color:var(--tx);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;flex-direction:column;gap:8px}
+.emh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.emseg .btn{flex:1;padding:8px 4px;font-size:13px}
+.emr{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--sub)}.emr b{color:var(--tx)}.emr input{width:100%;accent-color:var(--main)}
+.emb{display:grid;grid-template-columns:1fr 1fr;gap:6px}.emb .btn{padding:8px 6px;font-size:13px}
+.emn{margin:0;font-size:11px;color:var(--sub)}
+@media (max-width:600px){.empanel{top:auto;bottom:60px;left:8px;right:8px;width:auto;max-height:46%}}
 .mfb{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:16px;color:var(--sub)}
 .opt.sel{border-color:var(--main);background:color-mix(in srgb,var(--main) 14%,var(--card));font-weight:700}
 .opt.sel::after{content:" ✓";color:var(--main)}
@@ -131,7 +139,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.2.2.3</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.3.0</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -294,7 +302,7 @@ const mulb=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.
 const hstr=s=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0};
 /* G.map = {v, seed, style, owned[]}。地形はseed+styleから決定論的に再生成するので高さデータは保存不要。ownedはv0.2.2で区画IDを入れる */
 function initMap(g){const s=hstr(g.mountain),ks=Object.keys(STY);let st=ks[s%ks.length];for(const k of ks)if(STY[k].includes(g.mountain))st=k;return{v:MAP_V,seed:s,style:st,owned:[]}}
-function validMap(m){return !!m&&typeof m==='object'&&m.v===MAP_V&&Number.isInteger(m.seed)&&has(STY,m.style)&&Array.isArray(m.owned)&&m.owned.every(x=>typeof x==='string')}
+function validMap(m){return !!m&&typeof m==='object'&&m.v===MAP_V&&Number.isInteger(m.seed)&&has(STY,m.style)&&Array.isArray(m.owned)&&m.owned.every(x=>typeof x==='string')&&(m.ed===undefined||(typeof m.ed==='string'&&m.ed.length<=64000))&&(m.tv===undefined||typeof m.tv==='string')}
 /* v0.2.1 大規模地形: 640×640 / 96×96セル(97×97頂点)、主要山頂×5〜8+尾根グラフ(最小全域木+追加)+谷+山麓。
    データ層のみ(描画非依存)。返り値 peaks/ridges/valleys/parcels は座標がワールド座標(中心原点, 単位=1/10m)。 */
 const TV='v3';
@@ -385,7 +393,7 @@ function genTerrain(seed,style){
  let mn=1e9,mxe=0;for(let k=0;k<K*K;k++){mn=Math.min(mn,E[k]);mxe=Math.max(mxe,E[k])}
  const peakOut=peaks.map(p=>({id:p.id,kind:p.kind,x:p.x*S/2,z:p.z*S/2,elev:Math.round(esamp(p.x*S/2,p.z*S/2))}));
  ridges.forEach(r=>r.pts.forEach(p=>{p.e=Math.round(esamp(p.x,p.z))}));
- return{key:seed+'/'+style+'/'+TV,n:N,k:K,size:S,cs,base:BASE,rel:REL,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe),peaks:peakOut,ridges,valleys,flats:flats.map(f=>({x:f.x*S/2,z:f.z*S/2,r:f.r*S/2,elev:Math.round(esamp(f.x*S/2,f.z*S/2))})),cellDev:dev,cellMod:mod}}
+ return{key:seed+'/'+style+'/'+TV,n:N,k:K,size:S,cs,base:BASE,rel:REL,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe),peaks:peakOut,ridges,valleys,flats:flats.map(f=>({x:f.x*S/2,z:f.z*S/2,r:f.r*S/2,elev:Math.round(esamp(f.x*S/2,f.z*S/2))})),cellDev:dev,cellMod:mod,cls:{q75,q88:qt(.88),q95:qt(.95),sg}}}
 /* 旧v0.2.0の地形生成(240×240, 単峰中心)。参照用に残置していますが現在は呼ばれません */
 function genTerrainV020(seed,style){
  const N=48,K=N+1,S=240,cs=S/N,HM=50,PS=4,R=mulb(seed),tab=new Float32Array(1024);
@@ -442,7 +450,7 @@ function genTerrainV020(seed,style){
 function tSample(t,x,z){const fx=Math.max(0,Math.min(t.n-.001,(x+t.size/2)/t.cs)),fz=Math.max(0,Math.min(t.n-.001,(z+t.size/2)/t.cs)),i=Math.floor(fx),j=Math.floor(fz),u=fx-i,v=fz-j,K=t.k,h=t.h;return(h[j*K+i]*(1-u)+h[j*K+i+1]*u)*(1-v)+(h[(j+1)*K+i]*(1-u)+h[(j+1)*K+i+1]*u)*v}
 function parcelIdOfCell(t,k){const i=k%t.n,j=(k/t.n)|0;return 'P'+String(((j/t.ps)|0)+1).padStart(2,'0')+'-'+String(((i/t.ps)|0)+1).padStart(2,'0')}
 let TC=null;
-function getTerrain(g){if(!validMap(g.map))g.map=initMap(g);const k=g.map.seed+'/'+g.map.style+'/'+TV;if(!TC||TC.key!==k)TC=genTerrain(g.map.seed,g.map.style);return TC}
+function getTerrain(g){if(!validMap(g.map))g.map=initMap(g);const k=g.map.seed+'/'+g.map.style+'/'+TV;const ed=(g.map.tv===TV&&g.map.ed)?g.map.ed:'';if(g.map.ed&&g.map.tv!==TV)toast('地形データのバージョンが異なるため、編集内容を適用できませんでした');if(!TC||TC.key!==k||TC.ed!==ed){TC=genTerrain(g.map.seed,g.map.style);tInitEdit(TC,ed);emReset()}return TC}
 
 /* [描画層] Three.jsへの依存はこの区間のみ。地形データ t を受け取って表示するだけ(メッシュの作り方・質感を変えてもデータはそのまま) */
 /* YS = 描画専用の高さ倍率(1単位=10mを基準に1.5倍)。地形データの標高・傾斜には影響しない */
@@ -462,20 +470,20 @@ function mvInit(){
  return MV.ok}
 function mvBuild(t){
  if(MV.grp){MV.sc.remove(MV.grp);MV.grp.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}
- const grp=new THREE.Group(),K=t.k,geo=new THREE.PlaneGeometry(t.size,t.size,t.n,t.n);
+ MV.imT=MV.imR=null;const grp=new THREE.Group(),K=t.k,geo=new THREE.PlaneGeometry(t.size,t.size,t.n,t.n);
  geo.rotateX(-Math.PI/2);
  const p=geo.attributes.position;for(let k=0;k<K*K;k++)p.setY(k,yOf(t,t.h[k]));
  geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(K*K*3),3));geo.computeVertexNormals();
  grp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:1,metalness:0})));
  const d=new THREE.Object3D();
- if(t.trees.length){const g=new THREE.ConeGeometry(1.3,4.2,6);g.translate(0,2.1,0);const im=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({color:0x2f6b3f,flatShading:true,roughness:1}),t.trees.length);t.trees.forEach((q,i)=>{d.position.set(q.x,yOf(t,tSample(t,q.x,q.z)),q.z);d.scale.set(q.s,q.s,q.s);d.updateMatrix();im.setMatrixAt(i,d.matrix)});grp.add(im)}
- if(t.rocks.length){const im=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0x6c7078,flatShading:true,roughness:1}),t.rocks.length);t.rocks.forEach((q,i)=>{d.position.set(q.x,yOf(t,tSample(t,q.x,q.z))+q.s*.3,q.z);d.scale.set(q.s,q.s*.7,q.s);d.updateMatrix();im.setMatrixAt(i,d.matrix)});grp.add(im)}
- MV.sc.add(grp);MV.grp=grp;MV.geo=geo;MV.t=t;MV.key=t.key}
+ if(t.trees.length){const g=new THREE.ConeGeometry(1.3,4.2,6);g.translate(0,2.1,0);const im=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({color:0x2f6b3f,flatShading:true,roughness:1}),t.trees.length);t.trees.forEach((q,i)=>{d.position.set(q.x,yOf(t,tSample(t,q.x,q.z)),q.z);d.scale.set(q.s,q.s,q.s);d.updateMatrix();im.setMatrixAt(i,d.matrix)});im.frustumCulled=false;MV.imT=im;grp.add(im)}
+ if(t.rocks.length){const im=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0x6c7078,flatShading:true,roughness:1}),t.rocks.length);t.rocks.forEach((q,i)=>{d.position.set(q.x,yOf(t,tSample(t,q.x,q.z))+q.s*.3,q.z);d.scale.set(q.s,q.s*.7,q.s);d.updateMatrix();im.setMatrixAt(i,d.matrix)});im.frustumCulled=false;MV.imR=im;grp.add(im)}
+ MV.sc.add(grp);MV.grp=grp;MV.geo=geo;MV.t=t;MV.key=t.key;if(t.dl)mvInstances(t,null)}
 /* 頂点色 = 地形タイプの色 + 積雪量(G.wx.depth)に応じた雪線。天候システムとの連携点 */
-function mvColor(depth){
+function mvColor(depth,rb){
  if(!MV.geo)return;const t=MV.t,col=MV.geo.attributes.color,K=t.k,N=t.n,s=Math.min(1,depth/150),hs=.92-.82*s-Math.max(0,Math.min(1,(depth-150)/850))*.3,c=new THREE.Color(),w=new THREE.Color(0xffffff);
- for(let j=0;j<K;j++)for(let i=0;i<K;i++){const k=j*K+i,ty=t.cellType[Math.min(j,N-1)*N+Math.min(i,N-1)],hn=(t.h[k]-t.base)/t.rel;c.setHex(TCOL[ty]);
-  let f=Math.max(0,Math.min(1,(hn-hs)/.18));if(ty===3)f*=.5;if(depth<10)f=0;c.lerp(w,f);const v=.93+.14*h01(k);col.setXYZ(k,c.r*v,c.g*v,c.b*v)}
+ for(let j=rb?rb[1]:0;j<=(rb?rb[3]:K-1);j++)for(let i=rb?rb[0]:0;i<=(rb?rb[2]:K-1);i++){const k=j*K+i,ty=t.cellType[Math.min(j,N-1)*N+Math.min(i,N-1)],hn=(t.h[k]-t.base)/t.rel;c.setHex(TCOL[ty]);
+  let f=Math.max(0,Math.min(1,(hn-hs)/.18));if(ty===3)f*=.5;if(depth<10)f=0;c.lerp(w,f);if(t.pd&&EM.cols){const pv=t.pd[k];if(pv>.5||pv<-.5)c.lerp(EM.cols[pv>0?1:0],Math.min(.65,Math.abs(pv)/25))}const v=.93+.14*h01(k);col.setXYZ(k,c.r*v,c.g*v,c.b*v)}
  col.needsUpdate=true}
 function mvCam(){const c=MV.cam,t=MV.t,cp=Math.cos(MV.pitch),gy=t?yOf(t,tSample(t,MV.tx,MV.tz)):30,w=Math.max(0,Math.min(1,(700-MV.d)/600)),ly=(t?(t.emax-t.base)*YS*.22:30)*(1-w)+gy*w,cx=MV.tx+MV.d*cp*Math.sin(MV.yaw),cz=MV.tz+MV.d*cp*Math.cos(MV.yaw);let cy=ly+MV.d*Math.sin(MV.pitch);if(t)cy=Math.max(cy,yOf(t,tSample(t,cx,cz))+6);c.position.set(cx,cy,cz);c.lookAt(MV.tx,ly,MV.tz)}
 /* オンデマンド描画: 操作・リサイズ・データ更新時だけ描画し、常時ループは回さない(非表示中は描画しない) */
@@ -490,14 +498,14 @@ function mvBind(cv){
  const P=new Map();let pd=0;
  const pdist=()=>{const a=[...P.values()];return a.length<2?0:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])};
  cv.style.touchAction='none';
- cv.addEventListener('pointerdown',e=>{try{cv.setPointerCapture(e.pointerId)}catch(_){}P.set(e.pointerId,[e.clientX,e.clientY]);pd=pdist();cv.style.cursor='grabbing'});
- cv.addEventListener('pointermove',e=>{const o=P.get(e.pointerId);if(!o)return;const dx=e.clientX-o[0],dy=e.clientY-o[1];P.set(e.pointerId,[e.clientX,e.clientY]);if(P.size===1)mvPan(dx,dy);else if(P.size===2){const n=pdist();if(pd>0&&n>0)mvZoom(pd/n);pd=n}});
- const up=e=>{P.delete(e.pointerId);pd=pdist();if(!P.size)cv.style.cursor='grab'};
+ cv.addEventListener('pointerdown',e=>{try{cv.setPointerCapture(e.pointerId)}catch(_){}P.set(e.pointerId,[e.clientX,e.clientY]);pd=pdist();cv.style.cursor=EM.on?'crosshair':'grabbing';emDown(e,P)});
+ cv.addEventListener('pointermove',e=>{const o=P.get(e.pointerId);if(!o){emHover(e);return}const dx=e.clientX-o[0],dy=e.clientY-o[1];P.set(e.pointerId,[e.clientX,e.clientY]);if(emMove(e,P,dx,dy))return;if(P.size===1)mvPan(dx,dy);else if(P.size===2){const n=pdist();if(pd>0&&n>0)mvZoom(pd/n);pd=n;if(EM.on)mvPan(dx/2,dy/2)}});
+ const up=e=>{emUp(e,P);P.delete(e.pointerId);pd=pdist();if(!P.size)cv.style.cursor=EM.on?'crosshair':'grab'};
  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
  cv.addEventListener('wheel',e=>{e.preventDefault();mvZoom(Math.exp((e.deltaMode===1?e.deltaY*33:e.deltaY)*.0012))},{passive:false});
  cv.addEventListener('webglcontextlost',e=>e.preventDefault());
  cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}})}
-function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button></span></div>`}
+function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button><button class="btn" data-m="edit">地形編集</button></span></div>`}
 /* v0.2.1.2: MOUNTAIN MAPは地形マップ専用の大画面(ヘッダーとナビを除く全領域)。表示カードは無くしたが地形データ(getTerrain)は維持 */
 function layoutVars(){const h=$('.hd'),n=$('#nav'),s=document.documentElement.style;s.setProperty('--hh',(h?h.offsetHeight:64)+'px');s.setProperty('--nh',n&&getComputedStyle(n).position==='fixed'?n.offsetHeight+'px':'0px')}
 function mapPage(){return '<div class="map m3 big" id="mapbox"></div>'}
@@ -521,9 +529,9 @@ function mountMap(){
  box.innerHTML='';
  if(!mvInit()){MV.box=null;box.innerHTML=`<div class="mfb"><b style="color:var(--tx)">3Dマップを表示できません</b><span>${E(MV.err||'WebGL非対応')}</span><span>ゲームのほかの機能は通常どおり利用できます。</span></div>`;return}
  try{
-  const t=getTerrain(G);if(MV.key!==t.key)mvBuild(t);
+  const t=getTerrain(G);if(MV.t!==t)mvBuild(t);
   mvColor(G.wx?G.wx.depth:0);
-  box.appendChild(MV.cv);box.insertAdjacentHTML('beforeend',hud());
+  box.appendChild(MV.cv);box.insertAdjacentHTML('beforeend',hud());if(EM.on){box.insertAdjacentHTML('beforeend',emPanel());emRefresh()}
   MV.box=box;mvTheme();mvResize();if(!MV.fit){MV.fit=1;mvFit()}
   if(window.ResizeObserver){if(MV.ro)MV.ro.disconnect();MV.ro=new ResizeObserver(mvResize);MV.ro.observe(box)}
   mvDraw();
@@ -532,8 +540,91 @@ function mountMap(){
 const _rv=renderView;
 renderView=function(){$('#main').classList.toggle('wide',view==='map');if(view==='map')$('#main').innerHTML=mapPage();else if(view==='dash')$('#main').innerHTML=dashPage();else _rv();layoutVars();mountMap()};
 const _at=applyTheme;applyTheme=function(){_at();mvTheme()};
-document.addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b||!MV.ok)return;const a=b.dataset.m;if(a==='in')mvZoom(.8);else if(a==='out')mvZoom(1.25);else if(a==='reset')mvReset()});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b||!MV.ok)return;const a=b.dataset.m;if(a==='in')mvZoom(.8);else if(a==='out')mvZoom(1.25);else if(a==='reset')mvReset();else if(a==='edit')emToggle()});
 window.addEventListener('resize',()=>{layoutVars();mvResize()});
+
+/* ===== v0.3.0 地形編集(ハイブリッド型の基盤 + 自由ブラシ) =====
+   [データ層] t.h0=生成直後の標高(不変) / t.dl=確定済みの変更量(m) / t.pd=未確定(プレビュー)の変更量(m) / t.h=現在の標高(=h0+dl+pd)。
+   保存は dl を Int16 → base64 で G.map.ed に(生成パラメータは seed/style のまま)。区画指定方式・平滑化等は、
+   新しいツールから tStamp と同様に pd を書き込み tCommit で確定する形で追加できる。 */
+const ED_MAX=800,ED_MIN_E=400,ED_MAX_E=3400,ED_TALUS=1.5;
+function edEnc(dl){const n=dl.length,u=new Int16Array(n);let any=false;for(let i=0;i<n;i++){const v=Math.max(-ED_MAX,Math.min(ED_MAX,Math.round(dl[i])));u[i]=v;if(v)any=true}if(!any)return '';const b=new Uint8Array(u.buffer);let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s)}
+function edDec(str,n){try{const s=atob(str);if(s.length!==n*2)return null;const b=new Uint8Array(n*2);for(let i=0;i<b.length;i++)b[i]=s.charCodeAt(i);const u=new Int16Array(b.buffer),o=new Float32Array(n);for(let i=0;i<n;i++)o[i]=Math.max(-ED_MAX,Math.min(ED_MAX,u[i]));return o}catch(e){return null}}
+function tStats(t){let mn=1e9,mx=0;for(let k=0;k<t.h.length;k++){const v=t.h[k];if(v<mn)mn=v;if(v>mx)mx=v}t.emin=Math.round(mn);t.emax=Math.round(mx)}
+function tInitEdit(t,ed){t.h0=Float32Array.from(t.h);t.dl=new Float32Array(t.k*t.k);t.pd=null;t.ed=ed||'';
+ if(ed){const d=edDec(ed,t.k*t.k);if(d){for(let k=0;k<d.length;k++){const e=Math.max(ED_MIN_E,Math.min(ED_MAX_E,t.h0[k]+d[k]));t.dl[k]=e-t.h0[k];t.h[k]=e}tReclass(t,0,0,t.k-1,t.k-1);tStats(t)}else{t.ed='';toast('地形の編集データを読み込めなかったため、元の地形を表示します')}}}
+/* 変更された頂点範围[i0,j0,i1,j1]に関連するセル属性(標高・傾斜・タイプ・開発適性・区画)を再計算 */
+function tReclass(t,i0,j0,i1,j1){const N=t.n,K=t.k,E=t.h,HM=t.cs*10,ce=t.cellElev,sl=t.cellSlope,ty=t.cellType,dv=t.cellDev,md=t.cellMod,base=t.base,rel=t.rel,cl=t.cls;
+ const ci0=Math.max(0,i0-1),cj0=Math.max(0,j0-1),ci1=Math.min(N-1,i1),cj1=Math.min(N-1,j1);
+ for(let j=cj0;j<=cj1;j++)for(let i=ci0;i<=ci1;i++){const a=j*K+i,b=a+1,c=a+K,d=c+1,q=j*N+i;ce[q]=(E[a]+E[b]+E[c]+E[d])/4;sl[q]=Math.hypot((E[b]+E[d]-E[a]-E[c])/(2*HM),(E[c]+E[d]-E[a]-E[b])/(2*HM))}
+ const ri0=Math.max(0,ci0-2),rj0=Math.max(0,cj0-2),ri1=Math.min(N-1,ci1+2),rj1=Math.min(N-1,cj1+2);
+ for(let j=rj0;j<=rj1;j++)for(let i=ri0;i<=ri1;i++){const k=j*N+i,h=(ce[k]-base)/rel,s=sl[k];let sum=0,n=0,top=1;
+  for(let dj=-2;dj<=2;dj++)for(let di=-2;di<=2;di++){const jj=j+dj,ii=i+di;if(jj<0||ii<0||jj>=N||ii>=N||(!dj&&!di))continue;const v=(ce[jj*N+ii]-base)/rel;sum+=v;n++;if(v>h)top=0}
+  const cv=h-sum/n,t0=ty[k];let tp;
+  if(top&&h>.5)tp=5;else if((s>Math.max(.55,cl.q95)&&h>.3)||(h>.65&&s>Math.max(.5,cl.q88)))tp=3;else if(s<.1&&h<.35)tp=0;else if(cv>.7*cl.sg&&h>.18)tp=6;else if(cv<-.7*cl.sg)tp=7;else if(h>.5&&s<.55)tp=4;else if(s>Math.min(.55,cl.q75))tp=2;else if(s<.14&&h<.5)tp=0;else if(h<.62)tp=1;else tp=4;
+  if(tp!==t0){t.counts[t0]--;t.counts[tp]++;ty[k]=tp}
+  dv[k]=tp===3?0:s<.15?3:s<.3?2:s<.55?1:0;if(tp===5&&dv[k]>2)dv[k]=2;md[k]=tp===3?1:s>.55?2:0}
+ const ps=t.ps,pn=N/ps,n2=ps*ps;
+ for(let r=(rj0/ps)|0;r<=((rj1/ps)|0);r++)for(let q=(ri0/ps)|0;q<=((ri1/ps)|0);q++){const tc=Array(8).fill(0);let se=0,sq=0,sd=0,sx=0;
+  for(let j=0;j<ps;j++)for(let i=0;i<ps;i++){const k=(r*ps+j)*N+q*ps+i;tc[ty[k]]++;se+=ce[k];sq+=sl[k];sd+=dv[k];sx+=md[k]>0?1:0}
+  const P=t.parcels[r*pn+q];P.type=tc.indexOf(Math.max(...tc));P.elev=Math.round(se/n2);P.slope=Math.round(Math.atan(sq/n2)*1800/Math.PI)/10;P.suit=Math.round(sd/n2*10)/10;P.modCells=sx}}
+/* ブラシの1スタンプ: x,z=中心(ワールド座標), R=半径, amt=中心での変化量(m, 正=隆起/負=掘削)。コサイン減衰+急傾斜の制限(talus) */
+function tStamp(t,x,z,R,amt){const K=t.k,cs=t.cs,S2=t.size/2;if(!t.pd)t.pd=new Float32Array(K*K);
+ const i0=Math.max(0,Math.floor((x-R+S2)/cs)),i1=Math.min(K-1,Math.ceil((x+R+S2)/cs)),j0=Math.max(0,Math.floor((z-R+S2)/cs)),j1=Math.min(K-1,Math.ceil((z+R+S2)/cs));
+ for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const d=Math.hypot(-S2+i*cs-x,-S2+j*cs-z);if(d>=R)continue;const w=.5*(1+Math.cos(Math.PI*d/R)),k=j*K+i,b0=t.h0[k]+t.dl[k];let nv=t.pd[k]+amt*w;nv=Math.max(-ED_MAX-t.dl[k],Math.min(ED_MAX-t.dl[k],nv));nv=Math.max(ED_MIN_E-b0,Math.min(ED_MAX_E-b0,nv));t.pd[k]=nv;t.h[k]=b0+nv}
+ const bb=[Math.max(0,i0-2),Math.max(0,j0-2),Math.min(K-1,i1+2),Math.min(K-1,j1+2)],lim=ED_TALUS*cs*10;
+ for(let it=0;it<2;it++)for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i;if(!t.pd[k])continue;const b0=t.h0[k]+t.dl[k];
+  for(const nk of [i>0?k-1:-1,i<K-1?k+1:-1,j>0?k-K:-1,j<K-1?k+K:-1]){if(nk<0)continue;const diff=t.h[k]-t.h[nk],al=Math.max(lim,Math.abs(b0-(t.h0[nk]+t.dl[nk])));if(diff>al)t.pd[k]-=(diff-al)*.5;else if(diff<-al)t.pd[k]+=(-diff-al)*.5;t.h[k]=b0+t.pd[k]}}
+ return bb}
+function tCancel(t,bb){if(!t.pd)return;const K=t.k;for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i;t.pd[k]=0;t.h[k]=t.h0[k]+t.dl[k]}}
+function tCommit(t,bb){if(!t.pd)return null;const K=t.k,idx=[],bf=[],af=[];let i0=K,j0=K,i1=-1,j1=-1;
+ for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i,v=t.pd[k];if(v>.05||v<-.05){const nv=Math.max(-ED_MAX,Math.min(ED_MAX,Math.round((t.dl[k]+v)*10)/10));idx.push(k);bf.push(t.dl[k]);af.push(nv);t.dl[k]=nv;if(i<i0)i0=i;if(i>i1)i1=i;if(j<j0)j0=j;if(j>j1)j1=j}t.pd[k]=0;t.h[k]=t.h0[k]+t.dl[k]}
+ if(!idx.length)return null;const b=[Math.max(0,i0-2),Math.max(0,j0-2),Math.min(K-1,i1+2),Math.min(K-1,j1+2)];tReclass(t,b[0],b[1],b[2],b[3]);tStats(t);return{idx:Int32Array.from(idx),bf:Float32Array.from(bf),af:Float32Array.from(af),bb:b}}
+function tApplyPatch(t,p,fwd){const a=fwd?p.af:p.bf;for(let n=0;n<p.idx.length;n++){const k=p.idx[n];t.dl[k]=a[n];t.h[k]=t.h0[k]+t.dl[k]}tReclass(t,p.bb[0],p.bb[1],p.bb[2],p.bb[3]);tStats(t);return p.bb}
+/* 地形とレイの交点(ハイトフィールドのレイマーチ+二分探索)。描画ライブラリ非依存 */
+function tRay(t,o,v,maxT,st){const S=t.size/2;let prev=0;for(let s=0;s<maxT;s+=st){const x=o.x+v.x*s,z=o.z+v.z*s,y=o.y+v.y*s;if(Math.abs(x)>S||Math.abs(z)>S){if(y<-40)break;prev=s;continue}
+  if(y<=yOf(t,tSample(t,x,z))){let a=prev,b=s;for(let n=0;n<10;n++){const m=(a+b)/2;if(o.y+v.y*m<=yOf(t,tSample(t,o.x+v.x*m,o.z+v.z*m)))b=m;else a=m}const f=(a+b)/2;return{x:o.x+v.x*f,z:o.z+v.z*f}}prev=s}return null}
+
+/* [UI・描画連携層] */
+const EM={on:false,tool:'dig',size:40,str:5,stack:[],redo:[],stroking:false,last:null,pick:null,pb:null,cols:null,ring:null};
+function emReset(){EM.on=false;EM.stack=[];EM.redo=[];EM.pb=null;EM.stroking=false;EM.last=null;EM.pick=null}
+function emGfx(){if(EM.cols)return;EM.cols=[new THREE.Color(0xff6a3d),new THREE.Color(0x3da5ff)];const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(49*3),3));EM.ring=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff6a3d,depthTest:false,transparent:true}));EM.ring.frustumCulled=false;EM.ring.renderOrder=10;EM.ring.visible=false;MV.sc.add(EM.ring)}
+function mvRay(cx,cy){const r=MV.cv.getBoundingClientRect(),nx=(cx-r.left)/r.width*2-1,ny=-((cy-r.top)/r.height*2-1);mvCam();MV.cam.updateMatrixWorld();const o=MV.cam.position,v=new THREE.Vector3(nx,ny,.5).unproject(MV.cam).sub(o).normalize();return{o:{x:o.x,y:o.y,z:o.z},v:{x:v.x,y:v.y,z:v.z}}}
+function mvPick(cx,cy){const t=MV.t;if(!t||!MV.cv)return null;const q=mvRay(cx,cy);return tRay(t,q.o,q.v,MV.d*2.5+2000,Math.max(2,MV.d*.004))}
+function mvInstances(t,b){const d=new THREE.Object3D(),S=t.size,cs=t.cs,K=t.k,bb=b?[-S/2+b[0]*cs-cs,-S/2+b[1]*cs-cs,-S/2+b[2]*cs+cs,-S/2+b[3]*cs+cs]:null;
+ const dead=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3};
+ const run=(im,arr,rk)=>{if(!im)return;for(let n=0;n<arr.length;n++){const q=arr[n];if(bb&&(q.x<bb[0]||q.x>bb[2]||q.z<bb[1]||q.z>bb[3]))continue;d.position.set(q.x,yOf(t,tSample(t,q.x,q.z))+(rk?q.s*.3:0),q.z);const s=dead(q)?0:q.s;d.scale.set(s,s*(rk?.7:1),s);d.updateMatrix();im.setMatrixAt(n,d.matrix)}im.instanceMatrix.needsUpdate=true};
+ run(MV.imT,t.trees,0);run(MV.imR,t.rocks,1)}
+function mvEditRefresh(t,b,commit){if(!MV.geo||MV.t!==t)return;const K=t.k,p=MV.geo.attributes.position;for(let j=b[1];j<=b[3];j++)for(let i=b[0];i<=b[2];i++)p.setY(j*K+i,yOf(t,t.h[j*K+i]));p.needsUpdate=true;
+ const m=commit?3:1;mvColor(G&&G.wx?G.wx.depth:0,[Math.max(0,b[0]-m),Math.max(0,b[1]-m),Math.min(K-1,b[2]+m),Math.min(K-1,b[3]+m)]);mvInstances(t,b);if(commit)MV.geo.computeBoundingSphere();mvDraw()}
+function emRingUpdate(p){const g=EM.ring;if(!g)return;if(!p||!EM.on||EM.tool==='view'){g.visible=false;mvDraw();return}const t=MV.t,a=g.geometry.attributes.position;for(let n=0;n<=48;n++){const q=n/48*Math.PI*2,x=p.x+Math.cos(q)*EM.size,z=p.z+Math.sin(q)*EM.size;a.setXYZ(n,x,yOf(t,tSample(t,x,z))+2,z)}a.needsUpdate=true;g.material.color.copy(EM.cols[EM.tool==='dig'?0:1]);g.visible=true;mvDraw()}
+function emUnion(a,b){return a?[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])]:b}
+function emStampAt(p){const t=MV.t,R=EM.size,amt=(EM.tool==='dig'?-1:1)*EM.str*.8,sp=Math.max(t.cs*.8,R*.3);let pts=[];
+ if(!EM.last)pts=[p];else{const dx=p.x-EM.last.x,dz=p.z-EM.last.z,L=Math.hypot(dx,dz);if(L<sp)return;const n=Math.min(12,Math.floor(L/sp));for(let i=1;i<=n;i++)pts.push({x:EM.last.x+dx*i*sp/L,z:EM.last.z+dz*i*sp/L})}
+ let bb=null;for(const q of pts){bb=emUnion(bb,tStamp(t,q.x,q.z,R,amt));EM.last=q}
+ EM.pb=emUnion(EM.pb,bb);mvEditRefresh(t,bb,false);emRefresh()}
+function emDown(e,P){if(!EM.on||!MV.t)return;if(P.size>1){EM.stroking=false;EM.last=null;return}if(EM.tool==='view'||(e.pointerType==='mouse'&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;EM.stroking=true;EM.last=null;EM.pick=p;emStampAt(p);emRingUpdate(p)}
+function emMove(e,P,dx,dy){if(!EM.on||!EM.stroking||P.size!==1)return false;const p=mvPick(e.clientX,e.clientY);if(p){EM.pick=p;emStampAt(p);emRingUpdate(p)}return true}
+function emUp(e,P){if(EM.stroking&&P.size<=1){EM.stroking=false;EM.last=null;emRefresh()}}
+function emHover(e){if(!EM.on||EM.tool==='view'||!MV.t)return;const p=mvPick(e.clientX,e.clientY);EM.pick=p;emRingUpdate(p)}
+function emSave(t){G.map.ed=edEnc(t.dl);G.map.tv=TV;if(!G.map.ed)delete G.map.ed;t.ed=G.map.ed||''}
+function emCancel(){const t=MV.t;if(!t||!EM.pb)return;const bb=EM.pb;tCancel(t,bb);EM.pb=null;mvEditRefresh(t,bb,false);emRefresh()}
+function emCommit(){const t=MV.t;if(!t||!EM.pb)return;const pt=tCommit(t,EM.pb),bb=EM.pb;EM.pb=null;if(!pt){mvEditRefresh(t,bb,false);emRefresh();return}EM.stack.push(pt);if(EM.stack.length>30)EM.stack.shift();EM.redo=[];emSave(t);mvEditRefresh(t,pt.bb,true);emRefresh();toast('地形の変更を確定しました')}
+function emUndo(){const t=MV.t;if(!t)return;if(EM.pb){emCancel();return}const p=EM.stack.pop();if(!p)return;EM.redo.push(p);const bb=tApplyPatch(t,p,false);emSave(t);mvEditRefresh(t,bb,true);emRefresh()}
+function emRedo(){const t=MV.t;if(!t)return;const p=EM.redo.pop();if(!p)return;EM.stack.push(p);const bb=tApplyPatch(t,p,true);emSave(t);mvEditRefresh(t,bb,true);emRefresh()}
+function emTool(v){EM.tool=v;if(EM.stroking){EM.stroking=false;EM.last=null}if(MV.cv)MV.cv.style.cursor=v==='view'?'grab':'crosshair';emRingUpdate(v==='view'?null:EM.pick);emRefresh()}
+function emPanel(){return `<div class="empanel" id="empanel"><div class="emh"><b>地形編集</b><span id="em-st" class="note"></span></div><div class="seg emseg"><button class="btn" data-e="tool" data-v="dig">掘削</button><button class="btn" data-e="tool" data-v="raise">隆起</button><button class="btn" data-e="tool" data-v="view">視点移動</button></div><label class="emr"><span>ブラシサイズ <b id="em-szv"></b></span><input type="range" id="em-size" min="15" max="100" value="${EM.size}"></label><label class="emr"><span>加工強度 <b id="em-stv"></b></span><input type="range" id="em-str" min="1" max="10" value="${EM.str}"></label><div class="emb"><button class="btn p" data-e="commit" id="em-c">確定</button><button class="btn" data-e="cancel" id="em-x">キャンセル</button><button class="btn" data-e="undo" id="em-u">元に戻す</button><button class="btn" data-e="redo" id="em-r">やり直す</button><button class="btn" data-e="exit">編集終了</button></div><p class="emn">一本指(マウスは左ドラッグ)で加工。二本指・右ドラッグ・「視点移動」で画面を操作。確定した変更だけが保存されます。工事費・区画指定は今後追加予定です。</p></div>`}
+function emRefresh(){const t=MV.t,q=s=>document.getElementById(s);if(!q('empanel'))return;
+ document.querySelectorAll('#empanel [data-e=tool]').forEach(b=>b.classList.toggle('on',b.dataset.v===EM.tool));
+ q('em-szv').textContent='半径 '+EM.size*10+' m';q('em-stv').textContent=EM.str;
+ let n=0,mx=0;if(EM.pb&&t&&t.pd){const b=EM.pb,K=t.k;for(let j=b[1];j<=b[3];j++)for(let i=b[0];i<=b[2];i++){const v=Math.abs(t.pd[j*K+i]);if(v>.5){n++;if(v>mx)mx=v}}}
+ q('em-st').textContent=n?'未確定 '+n+'点 最大'+Math.round(mx)+'m':(EM.stack.length?'確定済み '+EM.stack.length+' 件':'');
+ q('em-c').disabled=!n;q('em-x').disabled=!n;q('em-u').disabled=!(n||EM.stack.length);q('em-r').disabled=!EM.redo.length}
+function emEnter(){if(!MV.ok||!MV.t||!MV.box){toast('3Dマップを表示できないため、地形編集は利用できません');return}emGfx();EM.on=true;MV.box.insertAdjacentHTML('beforeend',emPanel());MV.cv.style.cursor=EM.tool==='view'?'grab':'crosshair';emRefresh();mvDraw()}
+function emExit(){if(EM.pb){emCancel();toast('未確定の変更を破棄しました')}EM.on=false;EM.stroking=false;const p=document.getElementById('empanel');if(p)p.remove();if(EM.ring)EM.ring.visible=false;if(MV.cv)MV.cv.style.cursor='grab';mvDraw()}
+function emToggle(){if(EM.on)emExit();else emEnter()}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-e]');if(!b||!MV.ok||b.disabled)return;const a=b.dataset.e;if(a==='tool')emTool(b.dataset.v);else if(a==='commit')emCommit();else if(a==='cancel')emCancel();else if(a==='undo')emUndo();else if(a==='redo')emRedo();else if(a==='exit')emExit()});
+document.addEventListener('input',e=>{if(e.target.id==='em-size'){EM.size=+e.target.value;emRefresh();if(EM.pick)emRingUpdate(EM.pick)}else if(e.target.id==='em-str'){EM.str=+e.target.value;emRefresh()}});
 /* ---- game screen ---- */
 function enterGame(){show("game");view="dash";$("#hn").textContent=G.name;$("#nav").innerHTML=[NAV[1],NAV[0]].concat(NAV.slice(2)).map(n=>'<button class="ni" data-a="nav" data-v="'+n[0]+'"><span>'+n[2]+"</span></button>").join("")+'<div class="ns"><button class="ni" data-a="save"><span>SAVE</span></button><button class="ni" data-a="title"><span>TITLE</span></button></div>';upd()}
 function upd(){$("#hdt").textContent=fmtDate(G.date);$("#hf").textContent=yen(G.funds);document.querySelectorAll(".ni[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===view));renderView()}
@@ -577,7 +668,7 @@ document.addEventListener("click",ev=>{
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.2.2.3</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.3.0</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
