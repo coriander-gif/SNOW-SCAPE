@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.2.1.1</title>
+<title>SNOWSCAPE v0.2.1.2</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -46,7 +46,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .grid.m .opt small{white-space:pre-line;line-height:1.5;margin-top:4px}
 .map.m3{display:block;position:relative;padding:0;overflow:hidden;border:1px solid var(--bd);height:clamp(380px,62vh,720px);touch-action:none;background:var(--card);color:var(--tx)}
 .map.m3.big{height:clamp(480px,calc(100vh - 150px),1200px);height:clamp(480px,calc(100dvh - 150px),1200px)}
-main.wide{padding:12px 10px 28px}main.wide h2{margin-bottom:10px}
+main.wide{padding:0}
+main.wide .map.m3.big{height:max(360px,calc(100vh - var(--hh,64px) - var(--nh,0px)));height:max(360px,calc(100dvh - var(--hh,64px) - var(--nh,0px)));border:0;border-radius:0}
+.dg{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.dg .card{margin:0}.dg ul{margin:6px 0 0;padding-left:18px}.dg li{margin:4px 0}
 @media (max-width:800px){.map.m3.big{height:clamp(420px,calc(100vh - 250px),900px);height:clamp(420px,calc(100dvh - 250px),900px)}}
 .m3 canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
 .mh{position:absolute;left:10px;right:10px;display:flex;gap:8px;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;pointer-events:none}
@@ -129,7 +131,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.2.1.1</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.2.1.2</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -484,7 +486,24 @@ function mvBind(cv){
  cv.addEventListener('webglcontextlost',e=>e.preventDefault());
  cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}})}
 function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button></span></div>`}
-function mapPage(){const t=getTerrain(G);return `<h2>MOUNTAIN MAP</h2><div class="map m3 big" id="mapbox"></div><div class="card" style="margin-top:16px"><h3>TERRAIN DATA</h3><dl><dt>山岳エリア</dt><dd>${E(G.mountain)}</dd><dt>地形スタイル</dt><dd>${STJ[G.map.style]}</dd><dt>区画数</dt><dd>${t.parcels.length} 区画(土地取得は未実装)</dd><dt>地形規模</dt><dd>${t.size}×${t.size}(${t.n}×${t.n}メッシュ)</dd><dt>山頂・尾根・谷</dt><dd>山頂 ${t.peaks.length} / 尾根 ${t.ridges.length} / 谷底点 ${t.valleys.length}</dd><dt>相対標高(ゲーム内設定)</dt><dd>${t.emin}〜${t.emax} m</dd><dt>地形内訳(セル数)</dt><dd style="font-weight:500">${TJ.map((n,i)=>n+' '+t.counts[i]).join(' / ')}</dd></dl><p class="note">3Dマップはゲーム内の架空地形で、実際の地形ではありません。標高はゲーム内の開発用設定値で、実在の山の標高とは別です。操作: ドラッグで移動、ホイール/ピンチで拡大縮小。</p></div>`}
+/* v0.2.1.2: MOUNTAIN MAPは地形マップ専用の大画面(ヘッダーとナビを除く全領域)。表示カードは無くしたが地形データ(getTerrain)は維持 */
+function layoutVars(){const h=$('.hd'),n=$('#nav'),s=document.documentElement.style;s.setProperty('--hh',(h?h.offsetHeight:64)+'px');s.setProperty('--nh',n&&getComputedStyle(n).position==='fixed'?n.offsetHeight+'px':'0px')}
+function mapPage(){return '<div class="map m3 big" id="mapbox"></div>'}
+function seasonOf(d){return['冬','冬','早春','春','春','初夏','夏','夏','初秋','秋','晩秋','初冬'][+d.split('-')[1]-1]}
+/* DASHBOARD: 実装済みのデータのみ表示。未実装項目は「未実装」と明示する */
+function dashPage(){
+ const w=G.wx,k=(l,v,f)=>`<div class="k${f?' f':''}"><small>${l}</small><b>${v}</b></div>`,nt=[];
+ if(w.ev)nt.push(`気象イベント: ${w.ev}。${EVD[w.ev]}`);
+ if(w.c==='CLOSED')nt.push('積雪が不足しています。山岳コンディションは営業困難な水準です(施設の営業停止処理は未実装)。');
+ else if(w.c==='POOR')nt.push('雪質が悪化しています。');
+ else if(w.c==='EXCELLENT')nt.push('雪質・積雪ともに非常に良好です。');
+ nt.push('来場者数・収支・施設営業は未実装です(今後のアップデートで追加予定)。');
+ return `<h2>DASHBOARD</h2><div class="cards">${k('日付',fmtDate(G.date),1)}${k('季節',seasonOf(G.date))}${k('天候',w.w)}${k('気温',w.t+' ℃')}${k('降雪量',w.ns+' cm')}${k('積雪量',w.depth+' cm')}<div class="k"><small>ゲレンデコンディション</small><b>${w.c}</b><small>${CJ[w.c]}</small></div>${k('総資金',yen(G.funds),1)}${k('営業状況',E(G.phase))}${k('来場者数','未実装')}${k('収支','未実装')}${k('評判',G.reputation+' / 100')}</div>
+ <div class="dg"><div class="card"><h3>山岳レポート</h3><dl><dt>気象イベント</dt><dd>${w.ev?w.ev+(w.evNew?'(発生)':'(継続中)'):'なし'}</dd><dt>積雪の前日比</dt><dd>${w.dd>=0?'+':''}${w.dd} cm</dd></dl><p style="margin:12px 0 0"><button class="btn p" data-a="rpt">本日のレポートを開く</button></p></div>
+ <div class="card"><h3>お知らせ</h3><ul>${nt.map(t=>'<li>'+E(t)+'</li>').join('')}</ul></div>
+ <div class="card"><h3>GAME INFO</h3><dl><dt>スキー場</dt><dd>${E(G.name)}</dd><dt>山岳エリア</dt><dd>${E(G.region)} / ${E(G.mountain)}</dd><dt>難易度</dt><dd>${G.diff}</dd><dt>CPUライバル</dt><dd>${G.rival?'ON(未稼働)':'OFF'}</dd><dt>経過日数</dt><dd>${G.day} 日目</dd></dl><p class="note">天候・気温・積雪はゲーム内の架空シミュレーションです。</p></div></div>`}
+/* 旧カード型のマップページ(Terrain Dataカード付き)。現在は呼ばれない。地形データ自体は getTerrain で維持 */
+function mapPageLegacy(){const t=getTerrain(G);return `<h2>MOUNTAIN MAP</h2><div class="map m3 big" id="mapbox"></div><div class="card" style="margin-top:16px"><h3>TERRAIN DATA</h3><dl><dt>山岳エリア</dt><dd>${E(G.mountain)}</dd><dt>地形スタイル</dt><dd>${STJ[G.map.style]}</dd><dt>区画数</dt><dd>${t.parcels.length} 区画(土地取得は未実装)</dd><dt>地形規模</dt><dd>${t.size}×${t.size}(${t.n}×${t.n}メッシュ)</dd><dt>山頂・尾根・谷</dt><dd>山頂 ${t.peaks.length} / 尾根 ${t.ridges.length} / 谷底点 ${t.valleys.length}</dd><dt>相対標高(ゲーム内設定)</dt><dd>${t.emin}〜${t.emax} m</dd><dt>地形内訳(セル数)</dt><dd style="font-weight:500">${TJ.map((n,i)=>n+' '+t.counts[i]).join(' / ')}</dd></dl><p class="note">3Dマップはゲーム内の架空地形で、実際の地形ではありません。標高はゲーム内の開発用設定値で、実在の山の標高とは別です。操作: ドラッグで移動、ホイール/ピンチで拡大縮小。</p></div>`}
 function mountMap(){
  const box=$('#mapbox');if(!box){MV.box=null;return}
  box.innerHTML='';
@@ -499,12 +518,12 @@ function mountMap(){
  }catch(e){console.error(e);MV.box=null;box.innerHTML=`<div class="mfb"><b style="color:var(--tx)">3Dマップの描画に失敗しました</b><span>${E(String(e&&e.message||e))}</span></div>`}}
 /* 既存の画面描画に後付け: DASHBOARDのマップ領域とMOUNTAIN MAPメニューで同じ地形を表示する */
 const _rv=renderView;
-renderView=function(){$('#main').classList.toggle('wide',view==='map');if(view==='map')$('#main').innerHTML=mapPage();else _rv();if(view==='dash'){const o=$('#main .map');if(o){o.id='mapbox';o.classList.add('m3')}}mountMap()};
+renderView=function(){$('#main').classList.toggle('wide',view==='map');if(view==='map')$('#main').innerHTML=mapPage();else if(view==='dash')$('#main').innerHTML=dashPage();else _rv();layoutVars();mountMap()};
 const _at=applyTheme;applyTheme=function(){_at();mvTheme()};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b||!MV.ok)return;const a=b.dataset.m;if(a==='in')mvZoom(.8);else if(a==='out')mvZoom(1.25);else if(a==='reset')mvReset()});
-window.addEventListener('resize',()=>mvResize());
+window.addEventListener('resize',()=>{layoutVars();mvResize()});
 /* ---- game screen ---- */
-function enterGame(){show("game");view="dash";$("#hn").textContent=G.name;$("#nav").innerHTML=NAV.map(n=>'<button class="ni" data-a="nav" data-v="'+n[0]+'"><span>'+n[2]+"</span></button>").join("")+'<div class="ns"><button class="ni" data-a="save"><span>SAVE</span></button><button class="ni" data-a="title"><span>TITLE</span></button></div>';upd()}
+function enterGame(){show("game");view="dash";$("#hn").textContent=G.name;$("#nav").innerHTML=[NAV[1],NAV[0]].concat(NAV.slice(2)).map(n=>'<button class="ni" data-a="nav" data-v="'+n[0]+'"><span>'+n[2]+"</span></button>").join("")+'<div class="ns"><button class="ni" data-a="save"><span>SAVE</span></button><button class="ni" data-a="title"><span>TITLE</span></button></div>';upd()}
 function upd(){$("#hdt").textContent=fmtDate(G.date);$("#hf").textContent=yen(G.funds);document.querySelectorAll(".ni[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===view));renderView()}
 function renderView(){
  const m=$("#main");
@@ -546,13 +565,14 @@ document.addEventListener("click",ev=>{
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.2.1.1</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.2.1.2</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
   case"nav":view=v;upd();break;
   case"next":{if(!$("#modal").hidden)break;advanceDay(G);saveGame(true);upd();rReport();break}
   case"save":saveGame();break;
+  case"rpt":rReport();break;
   case"title":saveGame(true);G=null;refreshTitle();show("title");break;
  }
 });
