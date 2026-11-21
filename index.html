@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.2.0</title>
+<title>SNOWSCAPE v0.2.1</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -127,7 +127,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.2.0</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.2.1</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -290,7 +290,90 @@ const hstr=s=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charC
 /* G.map = {v, seed, style, owned[]}。地形はseed+styleから決定論的に再生成するので高さデータは保存不要。ownedはv0.2.2で区画IDを入れる */
 function initMap(g){const s=hstr(g.mountain),ks=Object.keys(STY);let st=ks[s%ks.length];for(const k of ks)if(STY[k].includes(g.mountain))st=k;return{v:MAP_V,seed:s,style:st,owned:[]}}
 function validMap(m){return !!m&&typeof m==='object'&&m.v===MAP_V&&Number.isInteger(m.seed)&&has(STY,m.style)&&Array.isArray(m.owned)&&m.owned.every(x=>typeof x==='string')}
+/* v0.2.1 大規模地形: 640×640 / 96×96セル(97×97頂点)、主要山頂×5〜8+尾根グラフ(最小全域木+追加)+谷+山麓。
+   データ層のみ(描画非依存)。返り値 peaks/ridges/valleys/parcels は座標がワールド座標(中心原点, 単位=1/10m)。 */
+const TV='v2';
 function genTerrain(seed,style){
+ const N=96,K=N+1,S=640,cs=S/N,HM=cs*10,PS=6,R=mulb(seed),tab=new Float32Array(1024);
+ for(let i=0;i<1024;i++)tab[i]=R();
+ const sm=a=>{a=Math.max(0,Math.min(1,a));return a*a*(3-2*a)};
+ const vn=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),u=sm(x-xi),v=sm(y-yi),g=(a,b)=>tab[(a&31)*32+(b&31)];return(g(xi,yi)*(1-u)+g(xi+1,yi)*u)*(1-v)+(g(xi,yi+1)*(1-u)+g(xi+1,yi+1)*u)*v};
+ const fbm=(x,y)=>{let a=.5,f=1,s=0;for(let o=0;o<4;o++){s+=a*vn(x*f+o*7.3,y*f+o*3.1);a*=.5;f*=2}return s/.9375};
+ const rid=(x,y)=>{let a=.5,f=1,s=0;for(let o=0;o<4;o++){s+=a*(1-Math.abs(2*vn(x*f+o*5.7,y*f+o*9.1)-1));a*=.5;f*=2}return s/.9375};
+ const REL={broad:1000,chain:1100,steep:1400,plateau:800}[style]||1000,BASE=500;
+ const nP={broad:5+(R()*2|0),chain:7+(R()*2|0),steep:6+(R()*2|0),plateau:5+(R()*2|0)}[style]||6;
+ /* 1. 山頂の配置(規則的にならないよう乱数+最小距離) */
+ const pts=[],far=(x,z,md)=>pts.every(p=>Math.hypot(p[0]-x,p[1]-z)>=md);
+ const put=(cx,cz,rad,md)=>{for(let k=0;k<60;k++){const a=R()*6.283,r=rad*Math.sqrt(R()),x=cx+Math.cos(a)*r,z=cz+Math.sin(a)*r;if(Math.abs(x)<.66&&Math.abs(z)<.66&&far(x,z,md)){pts.push([x,z]);return true}}return false};
+ if(style==='chain'){const a0=R()*Math.PI,c=Math.cos(a0),s=Math.sin(a0),b=(R()-.5)*.6;for(let k=0;k<nP;k++){const t=-.62+1.24*(k+(R()-.5)*.5)/(nP-1),u=b*(t*t-.13);pts.push([c*t-s*u+(R()-.5)*.1,s*t+c*u+(R()-.5)*.1])}}
+ else if(style==='steep'){const c1=[-.3+R()*.15,-.2+R()*.3],c2=[.3-R()*.15,.2-R()*.3];for(let k=0;k<nP;k++){const c=k%2?c2:c1;if(!put(c[0],c[1],.3,.2))put(0,0,.6,.15)}}
+ else{put(R()*.24-.12,R()*.24-.12,.01,0);while(pts.length<nP){if(!put(0,0,style==='plateau'?.62:.58,style==='plateau'?.26:.28)&&!put(0,0,.62,.12))break}}
+ const np=pts.length,hs=[1,.8+R()*.1];while(hs.length<np)hs.push(.45+R()*.33);
+ if(style!=='broad')for(let i=hs.length-1;i>0;i--){const j=R()*(i+1)|0,t=hs[i];hs[i]=hs[j];hs[j]=t}
+ const sc=style==='plateau'?.78:1;
+ const peaks=pts.map((p,i)=>({id:'K'+(i+1),x:p[0],z:p[1],h:hs[i]*sc,r:(style==='steep'?.2:.26)+R()*.1,kind:hs[i]>=1?'main':hs[i]>=.78?'sub':'minor'}));
+ /* 2. 尾根: 山頂間の最小全域木 + 追加の現状。各尾根はうねり・高さの起伏・鞍部(低い箇所)を持つ */
+ const ed=[],used=new Set([0]),dist=(a,b)=>Math.hypot(peaks[a].x-peaks[b].x,peaks[a].z-peaks[b].z);
+ while(used.size<np){let bd=1e9,ba=0,bb=0;for(const a of used)for(let b=0;b<np;b++)if(!used.has(b)&&dist(a,b)<bd){bd=dist(a,b);ba=a;bb=b}ed.push([ba,bb]);used.add(bb)}
+ for(let k=0;k<(style==='chain'?1:2);k++){let bd=1e9,ba=-1,bb=-1;for(let a=0;a<np;a++)for(let b=a+1;b<np;b++){if(ed.some(e=>(e[0]===a&&e[1]===b)||(e[0]===b&&e[1]===a)))continue;const d=dist(a,b);if(d<bd&&d<.6){bd=d;ba=a;bb=b}}if(ba>=0)ed.push([ba,bb])}
+ const rs=[],ridges=[];
+ for(const [a,b] of ed){const A=peaks[a],B=peaks[b],dx=B.x-A.x,dz=B.z-A.z,L=Math.hypot(dx,dz)||1,ox=-dz/L,oz=dx/L,w1=(R()-.5)*.22,w2=(R()-.5)*.09,ph=R()*6.28,fr=1+(R()*3|0),sad=.6+.2*R(),rw=.11+R()*.05,pp=[];
+  for(let i=0;i<=14;i++){const t=i/14,sn=Math.sin(Math.PI*t),o=w1*sn+w2*Math.sin(2*Math.PI*t),x=A.x+dx*t+ox*o,z=A.z+dz*t+oz*o,h=Math.max(.3,(A.h*(1-t)+B.h*t)*(1-(1-sad)*sn)*(.92+.08*Math.sin(t*6.28*fr+ph)));rs.push([x,z,h,rw]);pp.push({x:x*S/2,z:z*S/2})}
+  ridges.push({a:A.id,b:B.id,pts:pp})}
+ /* 3. 高さ場: 山麿の緩やかな盛り上がり + 山頂 + 尾根(max合成)。谷は山頂/尾根の間に自然にでき、低標高部は平坦化して谷底・山麿の平地にする */
+ const H=new Float32Array(K*K),NA={broad:.1,chain:.1,steep:.14,plateau:.12}[style]||.1;let mx=0;
+ for(let j=0;j<K;j++)for(let i=0;i<K;i++){
+  const x=(i/N-.5)*2,z=(j/N-.5)*2;let h=.14*Math.exp(-(x*x+z*z)/.9);
+  for(const p of peaks){const d2=(x-p.x)**2+(z-p.z)**2,r2=p.r*p.r;if(d2<9*r2)h=Math.max(h,p.h*Math.exp(-d2/r2))}
+  for(const q of rs){const d2=(x-q[0])**2+(z-q[1])**2,r2=q[3]*q[3];if(d2<9*r2)h=Math.max(h,q[2]*Math.exp(-d2/r2))}
+  if(style==='plateau')h=Math.max(h,.32*sm((.78-Math.hypot(x,z))/.3));
+  h+=NA*(fbm(x*2.4,z*2.4)-.5)*(.3+h);
+  h*=.88+.24*rid(x*2.2+3,z*2.2+5);
+  if(h<.25){const k=1-h/.25;h=h*(1-.45*k)+.45*k*(.09+.04*fbm(x*3,z*3))}
+  h*=1-.85*sm((Math.max(Math.abs(x),Math.abs(z))-.74)/.26);
+  H[j*K+i]=Math.max(0,h);if(h>mx)mx=h}
+ const E=new Float32Array(K*K);
+ for(let k=0;k<K*K;k++)E[k]=BASE+Math.pow(H[k]/mx,1.15)*REL;
+ const esamp=(x,z)=>{const fx=Math.max(0,Math.min(N-.001,(x+S/2)/cs)),fz=Math.max(0,Math.min(N-.001,(z+S/2)/cs)),i=fx|0,j=fz|0,u=fx-i,v=fz-j;return(E[j*K+i]*(1-u)+E[j*K+i+1]*u)*(1-v)+(E[(j+1)*K+i]*(1-u)+E[(j+1)*K+i+1]*u)*v};
+ /* 4. セル属性(標高・傾斜)と地形タイプ判定 */
+ const ce=new Float32Array(N*N),cn=new Float32Array(N*N),sl=new Float32Array(N*N),ty=new Uint8Array(N*N);
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=j*K+i,b=a+1,c=a+K,d=c+1,q=j*N+i;ce[q]=(E[a]+E[b]+E[c]+E[d])/4;cn[q]=(ce[q]-BASE)/REL;sl[q]=Math.hypot((E[b]+E[d]-E[a]-E[c])/(2*HM),(E[c]+E[d]-E[a]-E[b])/(2*HM))}
+ const sorted=Float32Array.from(sl).sort(),qt=f=>sorted[Math.floor(f*(N*N-1))],q75=qt(.75),q93=qt(.93);
+ const cvv=new Float32Array(N*N),tp=new Uint8Array(N*N),bt=new Uint8Array(N*N);let ss=0;
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const k=j*N+i,h=cn[k];let sum=0,c=0,top=1,bot=1;
+  for(let dj=-2;dj<=2;dj++)for(let di=-2;di<=2;di++){const jj=j+dj,ii=i+di;if(jj<0||ii<0||jj>=N||ii>=N||(!dj&&!di))continue;const v=cn[jj*N+ii];sum+=v;c++;if(v>h)top=0;if(v<h)bot=0}
+  cvv[k]=h-sum/c;tp[k]=top;bt[k]=bot;ss+=cvv[k]*cvv[k]}
+ const sg=Math.sqrt(ss/(N*N))||.01,valleys=[];
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const k=j*N+i,h=cn[k],s=sl[k],cv=cvv[k];let t;
+  if(tp[k]&&h>.5)t=5;
+  else if(s>Math.min(.9,q93)||(h>.6&&s>Math.min(.6,q75)))t=3;
+  else if(s<.1&&h<.35)t=0;
+  else if(cv>.7*sg&&h>.18)t=6;
+  else if(cv<-.7*sg)t=7;
+  else if(h>.5&&s<.55)t=4;
+  else if(s>Math.min(.55,q75))t=2;
+  else if(s<.14&&h<.5)t=0;
+  else if(h<.62)t=1;
+  else t=4;
+  ty[k]=t;if(bt[k]&&t===7&&valleys.length<60)valleys.push({x:-S/2+(i+.5)*cs,z:-S/2+(j+.5)*cs,elev:Math.round(ce[k])})}
+ for(const p of peaks){const i=Math.min(N-1,Math.max(0,Math.floor((p.x+1)/2*N))),j=Math.min(N-1,Math.max(0,Math.floor((p.z+1)/2*N)));ty[j*N+i]=5}
+ /* 5. 森・岩(表現方法はv0.2.0を維持。座標を増やすだけ) */
+ let trees=[];const rocks=[];
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const t=ty[j*N+i];let n=t===1?(R()<.75?1:0)+(cn[j*N+i]<.3&&R()<.3?1:0):t===7?(R()<.25?1:0):t===0?(R()<.05?1:0):0;
+  for(let q=0;q<n;q++)trees.push({x:-S/2+(i+R())*cs,z:-S/2+(j+R())*cs,s:1.1+R()});
+  if(t===3&&R()<.5)rocks.push({x:-S/2+(i+R())*cs,z:-S/2+(j+R())*cs,s:1.8+R()*2.2})}
+ if(trees.length>3200){const pk=3200/trees.length;trees=trees.filter(()=>R()<pk)}
+ /* 6. 区画(PS×PSセル)。v0.2.2の土地取得用。分割数は N/PS から自動算出 */
+ const parcels=[],pn=N/PS,cnt=Array(8).fill(0);for(let k=0;k<N*N;k++)cnt[ty[k]]++;
+ for(let r=0;r<pn;r++)for(let c=0;c<pn;c++){const tc=Array(8).fill(0);let se=0,sq=0;
+  for(let j=0;j<PS;j++)for(let i=0;i<PS;i++){const k=(r*PS+j)*N+c*PS+i;tc[ty[k]]++;se+=ce[k];sq+=sl[k]}
+  const n2=PS*PS;parcels.push({id:'P'+String(r+1).padStart(2,'0')+'-'+String(c+1).padStart(2,'0'),r,c,type:tc.indexOf(Math.max(...tc)),elev:Math.round(se/n2),slope:Math.round(Math.atan(sq/n2)*1800/Math.PI)/10,price:null,owned:false,developable:null})}
+ let mn=1e9,mxe=0;for(let k=0;k<K*K;k++){mn=Math.min(mn,E[k]);mxe=Math.max(mxe,E[k])}
+ const peakOut=peaks.map(p=>({id:p.id,kind:p.kind,x:p.x*S/2,z:p.z*S/2,elev:Math.round(esamp(p.x*S/2,p.z*S/2))}));
+ ridges.forEach(r=>r.pts.forEach(p=>{p.e=Math.round(esamp(p.x,p.z))}));
+ return{key:seed+'/'+style+'/'+TV,n:N,k:K,size:S,cs,base:BASE,rel:REL,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe),peaks:peakOut,ridges,valleys}}
+/* 旧v0.2.0の地形生成(240×240, 単峰中心)。参照用に残置していますが現在は呼ばれません */
+function genTerrainV020(seed,style){
  const N=48,K=N+1,S=240,cs=S/N,HM=50,PS=4,R=mulb(seed),tab=new Float32Array(1024);
  for(let i=0;i<1024;i++)tab[i]=R();
  const sm=a=>{a=Math.max(0,Math.min(1,a));return a*a*(3-2*a)};
@@ -344,18 +427,18 @@ function genTerrain(seed,style){
  return{key:seed+'/'+style,n:N,k:K,size:S,cs,base:BASE,rel,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe)}}
 function tSample(t,x,z){const fx=Math.max(0,Math.min(t.n-.001,(x+t.size/2)/t.cs)),fz=Math.max(0,Math.min(t.n-.001,(z+t.size/2)/t.cs)),i=Math.floor(fx),j=Math.floor(fz),u=fx-i,v=fz-j,K=t.k,h=t.h;return(h[j*K+i]*(1-u)+h[j*K+i+1]*u)*(1-v)+(h[(j+1)*K+i]*(1-u)+h[(j+1)*K+i+1]*u)*v}
 let TC=null;
-function getTerrain(g){if(!validMap(g.map))g.map=initMap(g);const k=g.map.seed+'/'+g.map.style;if(!TC||TC.key!==k)TC=genTerrain(g.map.seed,g.map.style);return TC}
+function getTerrain(g){if(!validMap(g.map))g.map=initMap(g);const k=g.map.seed+'/'+g.map.style+'/'+TV;if(!TC||TC.key!==k)TC=genTerrain(g.map.seed,g.map.style);return TC}
 
 /* [描画層] Three.jsへの依存はこの区間のみ。地形データ t を受け取って表示するだけ(メッシュの作り方・質感を変えてもデータはそのまま) */
-const YS=.07,MV={ok:null,q:0,tx:0,tz:0,d:330,yaw:.6,pitch:.9,key:'',box:null};
+const YS=.1,MV={ok:null,q:0,tx:0,tz:0,d:900,yaw:.6,pitch:.9,key:'',box:null};
 const yOf=(t,e)=>(e-t.base)*YS,h01=k=>(Math.imul(k+1,2654435761)>>>0)/4294967296;
 function mvInit(){
  if(MV.ok!==null)return MV.ok;
  try{
   if(!window.THREE)throw new Error('Three.jsを読み込めませんでした(ネットワークを確認してください)');
   const cv=document.createElement('canvas'),r=new THREE.WebGLRenderer({canvas:cv,antialias:true});
-  r.setClearColor(0xd6e9f4);MV.cv=cv;MV.r=r;MV.sc=new THREE.Scene();MV.sc.fog=new THREE.Fog(0xd6e9f4,380,900);
-  MV.cam=new THREE.PerspectiveCamera(40,1,1,2000);
+  r.setClearColor(0xd6e9f4);MV.cv=cv;MV.r=r;MV.sc=new THREE.Scene();MV.sc.fog=new THREE.Fog(0xd6e9f4,1100,3000);
+  MV.cam=new THREE.PerspectiveCamera(40,1,5,5000);
   MV.sc.add(new THREE.HemisphereLight(0xffffff,0x6d7f8f,.6));
   const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(-120,160,80);MV.sc.add(dl);
   mvBind(cv);MV.ok=true;
@@ -378,12 +461,13 @@ function mvColor(depth){
  for(let j=0;j<K;j++)for(let i=0;i<K;i++){const k=j*K+i,ty=t.cellType[Math.min(j,N-1)*N+Math.min(i,N-1)],hn=(t.h[k]-t.base)/t.rel;c.setHex(TCOL[ty]);
   let f=Math.max(0,Math.min(1,(hn-hs)/.18));if(ty===3)f*=.5;if(depth<10)f=0;c.lerp(w,f);const v=.93+.14*h01(k);col.setXYZ(k,c.r*v,c.g*v,c.b*v)}
  col.needsUpdate=true}
-function mvCam(){const c=MV.cam,cp=Math.cos(MV.pitch);c.position.set(MV.tx+MV.d*cp*Math.sin(MV.yaw),12+MV.d*Math.sin(MV.pitch),MV.tz+MV.d*cp*Math.cos(MV.yaw));c.lookAt(MV.tx,12,MV.tz)}
+function mvCam(){const c=MV.cam,cp=Math.cos(MV.pitch);c.position.set(MV.tx+MV.d*cp*Math.sin(MV.yaw),30+MV.d*Math.sin(MV.pitch),MV.tz+MV.d*cp*Math.cos(MV.yaw));c.lookAt(MV.tx,30,MV.tz)}
 /* オンデマンド描画: 操作・リサイズ・データ更新時だけ描画し、常時ループは回さない(非表示中は描画しない) */
 function mvDraw(){if(MV.q||!MV.ok||!MV.box||!MV.box.isConnected||MV.box.offsetParent===null)return;MV.q=requestAnimationFrame(()=>{MV.q=0;try{mvCam();MV.r.render(MV.sc,MV.cam)}catch(e){console.error(e)}})}
-function mvZoom(f){MV.d=Math.max(90,Math.min(520,MV.d*f));mvDraw()}
+function mvZoom(f){MV.d=Math.max(150,Math.min(1500,MV.d*f));mvDraw()}
 function mvPan(dx,dy){const k=MV.d*.73/Math.max(300,MV.cv.clientHeight),s=Math.sin(MV.yaw),c=Math.cos(MV.yaw),lim=(MV.t?MV.t.size:240)*.45;MV.tx=Math.max(-lim,Math.min(lim,MV.tx-c*dx*k-s*dy*k*1.26));MV.tz=Math.max(-lim,Math.min(lim,MV.tz+s*dx*k-c*dy*k*1.26));mvDraw()}
-function mvReset(){MV.tx=0;MV.tz=0;MV.d=330;mvDraw()}
+function mvFit(){const a=MV.cam?MV.cam.aspect:1.5;MV.d=Math.min(1500,900*Math.max(1,1.15/a))}
+function mvReset(){MV.tx=0;MV.tz=0;mvFit();mvDraw()}
 function mvResize(){const b=MV.box;if(!b||!MV.r)return;const w=b.clientWidth,h=b.clientHeight;if(!w||!h)return;MV.r.setPixelRatio(Math.min(window.devicePixelRatio||1,2));MV.r.setSize(w,h,false);MV.cam.aspect=w/h;MV.cam.updateProjectionMatrix();mvDraw()}
 function mvTheme(){if(!MV.r)return;const c=document.documentElement.dataset.theme==='dark'?0x14283a:0xd6e9f4;MV.r.setClearColor(c);MV.sc.fog.color.setHex(c);mvDraw()}
 function mvBind(cv){
@@ -398,7 +482,7 @@ function mvBind(cv){
  cv.addEventListener('webglcontextlost',e=>e.preventDefault());
  cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}})}
 function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button></span></div>`}
-function mapPage(){const t=getTerrain(G);return `<h2>MOUNTAIN MAP</h2><div class="map m3 big" id="mapbox"></div><div class="card" style="margin-top:16px"><h3>TERRAIN DATA</h3><dl><dt>山岳エリア</dt><dd>${E(G.mountain)}</dd><dt>地形スタイル</dt><dd>${STJ[G.map.style]}</dd><dt>区画数</dt><dd>${t.parcels.length} 区画(土地取得は未実装)</dd><dt>相対標高(ゲーム内設定)</dt><dd>${t.emin}〜${t.emax} m</dd><dt>地形内訳(セル数)</dt><dd style="font-weight:500">${TJ.map((n,i)=>n+' '+t.counts[i]).join(' / ')}</dd></dl><p class="note">3Dマップはゲーム内の架空地形で、実際の地形ではありません。標高はゲーム内の開発用設定値で、実在の山の標高とは別です。操作: ドラッグで移動、ホイール/ピンチで拡大縮小。</p></div>`}
+function mapPage(){const t=getTerrain(G);return `<h2>MOUNTAIN MAP</h2><div class="map m3 big" id="mapbox"></div><div class="card" style="margin-top:16px"><h3>TERRAIN DATA</h3><dl><dt>山岳エリア</dt><dd>${E(G.mountain)}</dd><dt>地形スタイル</dt><dd>${STJ[G.map.style]}</dd><dt>区画数</dt><dd>${t.parcels.length} 区画(土地取得は未実装)</dd><dt>地形規模</dt><dd>${t.size}×${t.size}(${t.n}×${t.n}メッシュ)</dd><dt>山頂・尾根・谷</dt><dd>山頂 ${t.peaks.length} / 尾根 ${t.ridges.length} / 谷底点 ${t.valleys.length}</dd><dt>相対標高(ゲーム内設定)</dt><dd>${t.emin}〜${t.emax} m</dd><dt>地形内訳(セル数)</dt><dd style="font-weight:500">${TJ.map((n,i)=>n+' '+t.counts[i]).join(' / ')}</dd></dl><p class="note">3Dマップはゲーム内の架空地形で、実際の地形ではありません。標高はゲーム内の開発用設定値で、実在の山の標高とは別です。操作: ドラッグで移動、ホイール/ピンチで拡大縮小。</p></div>`}
 function mountMap(){
  const box=$('#mapbox');if(!box){MV.box=null;return}
  box.innerHTML='';
@@ -407,7 +491,7 @@ function mountMap(){
   const t=getTerrain(G);if(MV.key!==t.key)mvBuild(t);
   mvColor(G.wx?G.wx.depth:0);
   box.appendChild(MV.cv);box.insertAdjacentHTML('beforeend',hud());
-  MV.box=box;mvTheme();mvResize();
+  MV.box=box;mvTheme();mvResize();if(!MV.fit){MV.fit=1;mvFit()}
   if(window.ResizeObserver){if(MV.ro)MV.ro.disconnect();MV.ro=new ResizeObserver(mvResize);MV.ro.observe(box)}
   mvDraw();
  }catch(e){console.error(e);MV.box=null;box.innerHTML=`<div class="mfb"><b style="color:var(--tx)">3Dマップの描画に失敗しました</b><span>${E(String(e&&e.message||e))}</span></div>`}}
@@ -460,7 +544,7 @@ document.addEventListener("click",ev=>{
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.2.0</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.2.1</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
