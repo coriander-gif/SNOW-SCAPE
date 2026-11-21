@@ -370,7 +370,7 @@ function genTerrain(seed,style){
  /* 5. 森・岩(表現方法はv0.2.0を維持。座標を増やすだけ) */
  let trees=[];const rocks=[];
  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const t=ty[j*N+i];let n=t===1?(R()<.75?1:0)+(cn[j*N+i]<.3&&R()<.3?1:0):t===7?(R()<.25?1:0):t===0?(R()<.05?1:0):0;
-  for(let q=0;q<n;q++)trees.push({x:-S/2+(i+R())*cs,z:-S/2+(j+R())*cs,s:1.5+R()*1.2);
+  for(let q=0;q<n;q++)trees.push({x:-S/2+(i+R())*cs,z:-S/2+(j+R())*cs,s:1.5+R()*1.2});
   if(t===3&&R()<.5)rocks.push({x:-S/2+(i+R())*cs,z:-S/2+(j+R())*cs,s:2.4+R()*2.6})}
  if(trees.length>4000){const pk=4000/trees.length;trees=trees.filter(()=>R()<pk)}
  /* 6. 区画(PS×PSセル)。v0.2.2の土地取得用。分割数は N/PS から自動算出 */
