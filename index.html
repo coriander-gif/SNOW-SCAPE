@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.1.3</title>
+<title>SNOWSCAPE v0.2.0</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -44,6 +44,15 @@ button{font:inherit;color:inherit;cursor:pointer}
 .opt:hover{border-color:var(--acc)}
 .grid.m{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
 .grid.m .opt small{white-space:pre-line;line-height:1.5;margin-top:4px}
+.map.m3{display:block;position:relative;padding:0;overflow:hidden;border:1px solid var(--bd);height:clamp(320px,50vh,520px);touch-action:none;background:var(--card);color:var(--tx)}
+.map.m3.big{height:clamp(420px,66vh,760px)}
+.m3 canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.mh{position:absolute;left:10px;right:10px;display:flex;gap:8px;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;pointer-events:none}
+.mh.top{top:10px}.mh.bot{bottom:10px}.mh>*{pointer-events:auto}
+.mchip{display:inline-flex;align-items:center;gap:5px;background:color-mix(in srgb,var(--card) 86%,transparent);border:1px solid var(--bd);border-radius:99px;padding:2px 9px;font-size:11px;color:var(--tx);margin:2px 3px 2px 0}
+.mchip i{width:9px;height:9px;border-radius:50%;display:inline-block;border:1px solid var(--bd)}
+.mbtn{display:flex;gap:6px}.mbtn .btn{padding:6px 12px;font-size:13px}
+.mfb{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:16px;color:var(--sub)}
 .opt.sel{border-color:var(--main);background:color-mix(in srgb,var(--main) 14%,var(--card));font-weight:700}
 .opt.sel::after{content:" ✓";color:var(--main)}
 input[type=text]{width:100%;font:inherit;padding:11px 12px;border-radius:12px;border:2px solid var(--bd);background:var(--bg);color:var(--tx);margin-top:8px}
@@ -105,6 +114,8 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
  .hs{gap:10px;font-size:13px}.logo{font-size:13px}
 }
 </style>
+<!-- 外部依存(3D描画): Three.js r128 / cdnjs。オフライン化する場合はこの1行をローカルJSに差し替える -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
@@ -116,7 +127,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.1.3</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.2.0</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -208,7 +219,7 @@ function realDate(s){if(typeof s!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(s))retu
 const has=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&typeof o.mountain==="string"&&o.mountain!==""&&o.mountain.length<=40&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100}
 function saveGame(quiet){if(!G)return;G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};const ok=lsSet(SK,JSON.stringify(G));if(!ok)toast("セーブに失敗しました(ブラウザの保存領域を確認してください)");else if(!quiet)toast("セーブしました");refreshTitle();return ok}
-function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}return{data:o,note}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
+function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);return{data:o,note}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
 function refreshTitle(){$("#bc").disabled=!lsGet(SK);$("#tn").textContent=""}
 /* ---- new game ---- */
 function newState(){N={region:"北海道",mt:REG["北海道"][0],diff:"NORMAL",rival:true,name:""}}
@@ -266,6 +277,146 @@ function validWx(w){return !!w&&typeof w==="object"&&WXN.includes(w.w)&&CN.inclu
 function rReport(){const w=G.wx,dd=w.dd,ex={"雪":"雪が降り、積雪が増えました。","大雪":"大雪となり、積雪が大きく増えました。","吹雪":"強風を伴う吹雪で、視界が悪化しています。","みぞれ":"みぞれが降り、雪が重く湿っています。","雨":"雨が降り、積雪が減少しています。","晴れ":w.t<=-3?"晴れて冷え込み、雪質は保たれています。":"晴れ間が広がり、雪はやや緩んでいます。","曇り":"雲が広がり、比較的落ち着いた天候です。"}[w.w],cs={EXCELLENT:"雪質・積雪ともに非常に良好です。",GOOD:"雪質は良好です。",FAIR:"コンディションは普通です。",POOR:"雪質が悪化しています。",CLOSED:"積雪が不足しており、山岳コンディションは営業困難な水準です。"}[w.c];
  modal('<h2>'+fmtDate(G.date)+' 山岳レポート</h2><dl><dt>天候</dt><dd>'+w.w+'</dd><dt>気温</dt><dd>'+w.t+'℃</dd><dt>降雪量</dt><dd>'+w.ns+'cm</dd><dt>積雪量</dt><dd>'+w.depth+'cm(前日比 '+(dd>=0?'+':'')+dd+'cm)</dd><dt>ゲレンデコンディション</dt><dd>'+w.c+'('+CJ[w.c]+')</dd><dt>気象イベント</dt><dd>'+(w.ev?(w.evNew?'発生: ':'継続中: ')+w.ev:'なし')+'</dd></dl><p>'+ex+(w.ev?EVD[w.ev]:'')+cs+'</p><p class="note">ゲーム内の架空シミュレーションです。CLOSEDは山岳コンディション上の評価で、施設の営業停止処理はまだ行いません。</p>')}
 DAILY.push(g=>{try{stepWx(g,g.wx)}catch(e){console.error(e)}});
+
+/* ===== v0.2.0 3D山岳マップ =====
+   [地形データ層] 描画ライブラリに依存しない純粋なデータ。将来の区画購入(v0.2.2)は parcels を使う。
+   標高は「ゲーム内の開発用相対標高(m)」で、実在の山の標高(MJ)とは別物。 */
+const MAP_V=1,TJ=['平坦地','森林地帯','急斜面','岩場','雪原','山頂','尾根','谷'];
+const TCOL=[0xb7c98b,0x3f7a4a,0xa08c6a,0x7a7f88,0xf2f7fb,0xe3e7ed,0xc9b88f,0x5d9c8c];
+const STJ={broad:'広がりのある山体',chain:'連なる峰',steep:'急峻な山岳',plateau:'高原と山岳'};
+const STY={broad:['ニセコ・羊蹄山周辺','ルスツ周辺','大雪山周辺','八幡平周辺','磐梯山周辺','御嶽山周辺','乗鞍岳周辺','大山周辺'],chain:['蔵王連峰','富良野周辺','八甲田山周辺','白山山麓','氷ノ山周辺','石鎚山周辺','恐羅漢山周辺','九重連山周辺'],steep:['白馬山麓','谷川岳周辺','立山山麓','妙高山周辺','武尊山周辺','苗場山周辺','奥越・荒島岳周辺','鷲ヶ岳周辺'],plateau:['志賀高原','安比高原周辺','丸沼高原周辺','野沢温泉周辺','手稲山周辺','奥伊吹・伊吹山周辺']};
+const mulb=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const hstr=s=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0};
+/* G.map = {v, seed, style, owned[]}。地形はseed+styleから決定論的に再生成するので高さデータは保存不要。ownedはv0.2.2で区画IDを入れる */
+function initMap(g){const s=hstr(g.mountain),ks=Object.keys(STY);let st=ks[s%ks.length];for(const k of ks)if(STY[k].includes(g.mountain))st=k;return{v:MAP_V,seed:s,style:st,owned:[]}}
+function validMap(m){return !!m&&typeof m==='object'&&m.v===MAP_V&&Number.isInteger(m.seed)&&has(STY,m.style)&&Array.isArray(m.owned)&&m.owned.every(x=>typeof x==='string')}
+function genTerrain(seed,style){
+ const N=48,K=N+1,S=240,cs=S/N,HM=50,PS=4,R=mulb(seed),tab=new Float32Array(1024);
+ for(let i=0;i<1024;i++)tab[i]=R();
+ const sm=a=>{a=Math.max(0,Math.min(1,a));return a*a*(3-2*a)};
+ const vn=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),u=sm(x-xi),v=sm(y-yi),g=(a,b)=>tab[(a&31)*32+(b&31)];return(g(xi,yi)*(1-u)+g(xi+1,yi)*u)*(1-v)+(g(xi,yi+1)*(1-u)+g(xi+1,yi+1)*u)*v};
+ const fbm=(x,y)=>{let a=.5,f=1,s=0;for(let o=0;o<4;o++){s+=a*vn(x*f+o*7.3,y*f+o*3.1);a*=.5;f*=2}return s/.9375};
+ const rid=(x,y)=>{let a=.5,f=1,s=0;for(let o=0;o<4;o++){s+=a*(1-Math.abs(2*vn(x*f+o*5.7,y*f+o*9.1)-1));a*=.5;f*=2}return s/.9375};
+ const bp=(x,z,p)=>p[3]*Math.exp(-((x-p[0])**2+(z-p[1])**2)/(p[2]*p[2]));
+ let pk=[],na=.1,ra=.12,rel=900,ang=0,rl=0,pl=0;
+ if(style==='broad'){pk=[[R()*.3-.15,R()*.3-.15,.7,1],[-.45+R()*.2,.3+R()*.3,.38,.55],[.4+R()*.2,-.3+R()*.3,.35,.5]]}
+ else if(style==='chain'){ang=R()*Math.PI;rl=1;na=.08;ra=.16;rel=1000;for(let k=0;k<5;k++){const t=-.7+.35*k;pk.push([Math.cos(ang)*t,Math.sin(ang)*t,.24+R()*.1,.55+R()*.45])}}
+ else if(style==='steep'){na=.06;ra=.3;rel=1300;pk=[[R()*.2-.1,R()*.2-.1,.3,1],[.35+R()*.15,.1+R()*.3,.26,.85],[-.35-R()*.1,-.15+R()*.3,.25,.75],[0,.45,.22,.6]]}
+ else{pl=1;na=.08;ra=.07;rel=700;pk=[[.45,-.3+R()*.3,.3,.55],[-.35,.25+R()*.2,.24,.4]]}
+ const H=new Float32Array(K*K);let mx=0;
+ for(let j=0;j<K;j++)for(let i=0;i<K;i++){
+  const x=(i/N-.5)*2,z=(j/N-.5)*2;let h=0;
+  for(const p of pk)h+=bp(x,z,p);
+  if(rl){const d=-Math.sin(ang)*x+Math.cos(ang)*z,tt=Math.cos(ang)*x+Math.sin(ang)*z;h+=.45*Math.exp(-(d*d)/.04)*(1-sm((Math.abs(tt)-.6)/.4))}
+  if(pl)h+=.5*(1-sm((Math.hypot(x,z)-.5)/.5));
+  h+=na*(fbm(x*2.2,z*2.2)-.5)+ra*rid(x*2.6,z*2.6)*Math.min(1,h*1.6);
+  h*=1-.8*sm((Math.max(Math.abs(x),Math.abs(z))-.72)/.28);
+  H[j*K+i]=Math.max(0,h);mx=Math.max(mx,H[j*K+i])}
+ const BASE=500,E=new Float32Array(K*K);
+ for(let k=0;k<K*K;k++)E[k]=BASE+Math.pow(H[k]/mx,1.15)*rel;
+ const ce=new Float32Array(N*N),cn=new Float32Array(N*N),sl=new Float32Array(N*N),ty=new Uint8Array(N*N);
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=j*K+i,b=a+1,c=a+K,d=c+1,q=j*N+i;ce[q]=(E[a]+E[b]+E[c]+E[d])/4;cn[q]=(ce[q]-BASE)/rel;sl[q]=Math.hypot((E[b]+E[d]-E[a]-E[c])/(2*HM),(E[c]+E[d]-E[a]-E[b])/(2*HM))}
+ let gt=0;for(let k=0;k<N*N;k++)if(cn[k]>cn[gt])gt=k;
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+  const k=j*N+i,h=cn[k],s=sl[k];let sum=0,c=0,top=true;
+  for(let dj=-2;dj<=2;dj++)for(let di=-2;di<=2;di++){const jj=j+dj,ii=i+di;if(jj<0||ii<0||jj>=N||ii>=N||(!dj&&!di))continue;const q=cn[jj*N+ii];if(Math.abs(dj)<=1&&Math.abs(di)<=1){sum+=q;c++}if(q>h)top=false}
+  const cv=h-sum/c;let t;
+  if(k===gt||(top&&h>.5))t=5;
+  else if(s>.9||(h>.68&&s>.55))t=3;
+  else if(h>.58&&s<.5)t=4;
+  else if(cv>.012&&h>.2)t=6;
+  else if(cv<-.012)t=7;
+  else if(s>.55)t=2;
+  else if(s<.12&&h<.5)t=0;
+  else if(h<.62)t=1;
+  else t=3;
+  ty[k]=t}
+ const trees=[],rocks=[];
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const t=ty[j*N+i];let n=t===1?(R()<.5?2:1)+(cn[j*N+i]<.3?1:0):t===7?(R()<.4?1:0):t===0?(R()<.1?1:0):0;
+  for(let q=0;q<n;q++)trees.push({x:-S/2+(i+R())*cs,z:-S/2+(j+R())*cs,s:.7+R()*.7});
+  if(t===3&&R()<.6)rocks.push({x:-S/2+(i+R())*cs,z:-S/2+(j+R())*cs,s:1.2+R()*2})}
+ trees.length=Math.min(trees.length,1600);
+ const parcels=[],pn=N/PS,cnt=Array(8).fill(0);for(let k=0;k<N*N;k++)cnt[ty[k]]++;
+ for(let r=0;r<pn;r++)for(let c=0;c<pn;c++){const tc=Array(8).fill(0);let se=0,ss=0;
+  for(let j=0;j<PS;j++)for(let i=0;i<PS;i++){const k=(r*PS+j)*N+c*PS+i;tc[ty[k]]++;se+=ce[k];ss+=sl[k]}
+  const n2=PS*PS;parcels.push({id:'P'+String(r+1).padStart(2,'0')+'-'+String(c+1).padStart(2,'0'),r,c,type:tc.indexOf(Math.max(...tc)),elev:Math.round(se/n2),slope:Math.round(Math.atan(ss/n2)*1800/Math.PI)/10,price:null,owned:false,developable:null})}
+ let mn=1e9,mxe=0;for(let k=0;k<K*K;k++){mn=Math.min(mn,E[k]);mxe=Math.max(mxe,E[k])}
+ return{key:seed+'/'+style,n:N,k:K,size:S,cs,base:BASE,rel,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe)}}
+function tSample(t,x,z){const fx=Math.max(0,Math.min(t.n-.001,(x+t.size/2)/t.cs)),fz=Math.max(0,Math.min(t.n-.001,(z+t.size/2)/t.cs)),i=Math.floor(fx),j=Math.floor(fz),u=fx-i,v=fz-j,K=t.k,h=t.h;return(h[j*K+i]*(1-u)+h[j*K+i+1]*u)*(1-v)+(h[(j+1)*K+i]*(1-u)+h[(j+1)*K+i+1]*u)*v}
+let TC=null;
+function getTerrain(g){if(!validMap(g.map))g.map=initMap(g);const k=g.map.seed+'/'+g.map.style;if(!TC||TC.key!==k)TC=genTerrain(g.map.seed,g.map.style);return TC}
+
+/* [描画層] Three.jsへの依存はこの区間のみ。地形データ t を受け取って表示するだけ(メッシュの作り方・質感を変えてもデータはそのまま) */
+const YS=.07,MV={ok:null,q:0,tx:0,tz:0,d:330,yaw:.6,pitch:.9,key:'',box:null};
+const yOf=(t,e)=>(e-t.base)*YS,h01=k=>(Math.imul(k+1,2654435761)>>>0)/4294967296;
+function mvInit(){
+ if(MV.ok!==null)return MV.ok;
+ try{
+  if(!window.THREE)throw new Error('Three.jsを読み込めませんでした(ネットワークを確認してください)');
+  const cv=document.createElement('canvas'),r=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+  r.setClearColor(0xd6e9f4);MV.cv=cv;MV.r=r;MV.sc=new THREE.Scene();MV.sc.fog=new THREE.Fog(0xd6e9f4,380,900);
+  MV.cam=new THREE.PerspectiveCamera(40,1,1,2000);
+  MV.sc.add(new THREE.HemisphereLight(0xffffff,0x6d7f8f,.6));
+  const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(-120,160,80);MV.sc.add(dl);
+  mvBind(cv);MV.ok=true;
+ }catch(e){MV.ok=false;MV.err=String(e&&e.message||e)}
+ return MV.ok}
+function mvBuild(t){
+ if(MV.grp){MV.sc.remove(MV.grp);MV.grp.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}
+ const grp=new THREE.Group(),K=t.k,geo=new THREE.PlaneGeometry(t.size,t.size,t.n,t.n);
+ geo.rotateX(-Math.PI/2);
+ const p=geo.attributes.position;for(let k=0;k<K*K;k++)p.setY(k,yOf(t,t.h[k]));
+ geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(K*K*3),3));geo.computeVertexNormals();
+ grp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:1,metalness:0})));
+ const d=new THREE.Object3D();
+ if(t.trees.length){const g=new THREE.ConeGeometry(1.3,4.2,6);g.translate(0,2.1,0);const im=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({color:0x2f6b3f,flatShading:true,roughness:1}),t.trees.length);t.trees.forEach((q,i)=>{d.position.set(q.x,yOf(t,tSample(t,q.x,q.z)),q.z);d.scale.set(q.s,q.s,q.s);d.updateMatrix();im.setMatrixAt(i,d.matrix)});grp.add(im)}
+ if(t.rocks.length){const im=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0x6c7078,flatShading:true,roughness:1}),t.rocks.length);t.rocks.forEach((q,i)=>{d.position.set(q.x,yOf(t,tSample(t,q.x,q.z))+q.s*.3,q.z);d.scale.set(q.s,q.s*.7,q.s);d.updateMatrix();im.setMatrixAt(i,d.matrix)});grp.add(im)}
+ MV.sc.add(grp);MV.grp=grp;MV.geo=geo;MV.t=t;MV.key=t.key}
+/* 頂点色 = 地形タイプの色 + 積雪量(G.wx.depth)に応じた雪線。天候システムとの連携点 */
+function mvColor(depth){
+ if(!MV.geo)return;const t=MV.t,col=MV.geo.attributes.color,K=t.k,N=t.n,s=Math.min(1,depth/150),hs=.92-.82*s,c=new THREE.Color(),w=new THREE.Color(0xffffff);
+ for(let j=0;j<K;j++)for(let i=0;i<K;i++){const k=j*K+i,ty=t.cellType[Math.min(j,N-1)*N+Math.min(i,N-1)],hn=(t.h[k]-t.base)/t.rel;c.setHex(TCOL[ty]);
+  let f=Math.max(0,Math.min(1,(hn-hs)/.18));if(ty===3)f*=.5;if(depth<10)f=0;c.lerp(w,f);const v=.93+.14*h01(k);col.setXYZ(k,c.r*v,c.g*v,c.b*v)}
+ col.needsUpdate=true}
+function mvCam(){const c=MV.cam,cp=Math.cos(MV.pitch);c.position.set(MV.tx+MV.d*cp*Math.sin(MV.yaw),12+MV.d*Math.sin(MV.pitch),MV.tz+MV.d*cp*Math.cos(MV.yaw));c.lookAt(MV.tx,12,MV.tz)}
+/* オンデマンド描画: 操作・リサイズ・データ更新時だけ描画し、常時ループは回さない(非表示中は描画しない) */
+function mvDraw(){if(MV.q||!MV.ok||!MV.box||!MV.box.isConnected||MV.box.offsetParent===null)return;MV.q=requestAnimationFrame(()=>{MV.q=0;try{mvCam();MV.r.render(MV.sc,MV.cam)}catch(e){console.error(e)}})}
+function mvZoom(f){MV.d=Math.max(90,Math.min(520,MV.d*f));mvDraw()}
+function mvPan(dx,dy){const k=MV.d*.73/Math.max(300,MV.cv.clientHeight),s=Math.sin(MV.yaw),c=Math.cos(MV.yaw),lim=(MV.t?MV.t.size:240)*.45;MV.tx=Math.max(-lim,Math.min(lim,MV.tx-c*dx*k-s*dy*k*1.26));MV.tz=Math.max(-lim,Math.min(lim,MV.tz+s*dx*k-c*dy*k*1.26));mvDraw()}
+function mvReset(){MV.tx=0;MV.tz=0;MV.d=330;mvDraw()}
+function mvResize(){const b=MV.box;if(!b||!MV.r)return;const w=b.clientWidth,h=b.clientHeight;if(!w||!h)return;MV.r.setPixelRatio(Math.min(window.devicePixelRatio||1,2));MV.r.setSize(w,h,false);MV.cam.aspect=w/h;MV.cam.updateProjectionMatrix();mvDraw()}
+function mvTheme(){if(!MV.r)return;const c=document.documentElement.dataset.theme==='dark'?0x14283a:0xd6e9f4;MV.r.setClearColor(c);MV.sc.fog.color.setHex(c);mvDraw()}
+function mvBind(cv){
+ const P=new Map();let pd=0;
+ const pdist=()=>{const a=[...P.values()];return a.length<2?0:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])};
+ cv.style.touchAction='none';
+ cv.addEventListener('pointerdown',e=>{try{cv.setPointerCapture(e.pointerId)}catch(_){}P.set(e.pointerId,[e.clientX,e.clientY]);pd=pdist();cv.style.cursor='grabbing'});
+ cv.addEventListener('pointermove',e=>{const o=P.get(e.pointerId);if(!o)return;const dx=e.clientX-o[0],dy=e.clientY-o[1];P.set(e.pointerId,[e.clientX,e.clientY]);if(P.size===1)mvPan(dx,dy);else if(P.size===2){const n=pdist();if(pd>0&&n>0)mvZoom(pd/n);pd=n}});
+ const up=e=>{P.delete(e.pointerId);pd=pdist();if(!P.size)cv.style.cursor='grab'};
+ cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+ cv.addEventListener('wheel',e=>{e.preventDefault();mvZoom(Math.exp(e.deltaY*.0012))},{passive:false});
+ cv.addEventListener('webglcontextlost',e=>e.preventDefault());
+ cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}})}
+function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button></span></div>`}
+function mapPage(){const t=getTerrain(G);return `<h2>MOUNTAIN MAP</h2><div class="map m3 big" id="mapbox"></div><div class="card" style="margin-top:16px"><h3>TERRAIN DATA</h3><dl><dt>山岳エリア</dt><dd>${E(G.mountain)}</dd><dt>地形スタイル</dt><dd>${STJ[G.map.style]}</dd><dt>区画数</dt><dd>${t.parcels.length} 区画(土地取得は未実装)</dd><dt>相対標高(ゲーム内設定)</dt><dd>${t.emin}〜${t.emax} m</dd><dt>地形内訳(セル数)</dt><dd style="font-weight:500">${TJ.map((n,i)=>n+' '+t.counts[i]).join(' / ')}</dd></dl><p class="note">3Dマップはゲーム内の架空地形で、実際の地形ではありません。標高はゲーム内の開発用設定値で、実在の山の標高とは別です。操作: ドラッグで移動、ホイール/ピンチで拡大縮小。</p></div>`}
+function mountMap(){
+ const box=$('#mapbox');if(!box){MV.box=null;return}
+ box.innerHTML='';
+ if(!mvInit()){MV.box=null;box.innerHTML=`<div class="mfb"><b style="color:var(--tx)">3Dマップを表示できません</b><span>${E(MV.err||'WebGL非対応')}</span><span>ゲームのほかの機能は通常どおり利用できます。</span></div>`;return}
+ try{
+  const t=getTerrain(G);if(MV.key!==t.key)mvBuild(t);
+  mvColor(G.wx?G.wx.depth:0);
+  box.appendChild(MV.cv);box.insertAdjacentHTML('beforeend',hud());
+  MV.box=box;mvTheme();mvResize();
+  if(window.ResizeObserver){if(MV.ro)MV.ro.disconnect();MV.ro=new ResizeObserver(mvResize);MV.ro.observe(box)}
+  mvDraw();
+ }catch(e){console.error(e);MV.box=null;box.innerHTML=`<div class="mfb"><b style="color:var(--tx)">3Dマップの描画に失敗しました</b><span>${E(String(e&&e.message||e))}</span></div>`}}
+/* 既存の画面描画に後付け: DASHBOARDのマップ領域とMOUNTAIN MAPメニューで同じ地形を表示する */
+const _rv=renderView;
+renderView=function(){if(view==='map')$('#main').innerHTML=mapPage();else _rv();if(view==='dash'){const o=$('#main .map');if(o){o.id='mapbox';o.classList.add('m3')}}mountMap()};
+const _at=applyTheme;applyTheme=function(){_at();mvTheme()};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b||!MV.ok)return;const a=b.dataset.m;if(a==='in')mvZoom(.8);else if(a==='out')mvZoom(1.25);else if(a==='reset')mvReset()});
+window.addEventListener('resize',()=>mvResize());
 /* ---- game screen ---- */
 function enterGame(){show("game");view="dash";$("#hn").textContent=G.name;$("#nav").innerHTML=NAV.map(n=>'<button class="ni" data-a="nav" data-v="'+n[0]+'"><span>'+n[2]+"</span></button>").join("")+'<div class="ns"><button class="ni" data-a="save"><span>SAVE</span></button><button class="ni" data-a="title"><span>TITLE</span></button></div>';upd()}
 function upd(){$("#hdt").textContent=fmtDate(G.date);$("#hf").textContent=yen(G.funds);document.querySelectorAll(".ni[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===view));renderView()}
@@ -305,11 +456,11 @@ document.addEventListener("click",ev=>{
   case"diff":N.diff=v;rNew();break;
   case"rival":N.rival=v==="1";rNew();break;
   case"start":{const nm=N.name.trim();if(!nm){chkName();return}
-   G={ver:2,name:nm,region:N.region,mountain:N.mt,diff:N.diff,rival:N.rival,funds:DIFF[N.diff].funds,date:"2026-11-01",day:1,phase:"開業準備中",reputation:50};G.wx=initWx(G);
+   G={ver:3,name:nm,region:N.region,mountain:N.mt,diff:N.diff,rival:N.rival,funds:DIFF[N.diff].funds,date:"2026-11-01",day:1,phase:"開業準備中",reputation:50};G.wx=initWx(G);G.map=initMap(G);
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.1.3</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.2.0</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
