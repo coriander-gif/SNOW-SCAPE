@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.3.0</title>
+<title>SNOWSCAPE v0.3.1</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -59,7 +59,7 @@ main.wide .map.m3.big{height:max(360px,calc(100vh - var(--hh,64px) - var(--nh,0p
 .mbtn{flex-wrap:wrap;justify-content:flex-end}
 .empanel{position:absolute;top:44px;right:10px;width:250px;max-height:calc(100% - 110px);overflow:auto;background:color-mix(in srgb,var(--card) 90%,transparent);border:1px solid var(--bd);border-radius:14px;padding:10px 12px;color:var(--tx);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;flex-direction:column;gap:8px}
 .emh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.emseg .btn{flex:1;padding:8px 4px;font-size:13px}
+.emseg{flex-wrap:wrap}.emseg .btn{flex:1 1 30%;padding:8px 4px;font-size:13px}
 .emr{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--sub)}.emr b{color:var(--tx)}.emr input{width:100%;accent-color:var(--main)}
 .emb{display:grid;grid-template-columns:1fr 1fr;gap:6px}.emb .btn{padding:8px 6px;font-size:13px}
 .emn{margin:0;font-size:11px;color:var(--sub)}
@@ -139,7 +139,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.3.0</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.3.1</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -572,10 +572,35 @@ function tReclass(t,i0,j0,i1,j1){const N=t.n,K=t.k,E=t.h,HM=t.cs*10,ce=t.cellEle
 function tStamp(t,x,z,R,amt){const K=t.k,cs=t.cs,S2=t.size/2;if(!t.pd)t.pd=new Float32Array(K*K);
  const i0=Math.max(0,Math.floor((x-R+S2)/cs)),i1=Math.min(K-1,Math.ceil((x+R+S2)/cs)),j0=Math.max(0,Math.floor((z-R+S2)/cs)),j1=Math.min(K-1,Math.ceil((z+R+S2)/cs));
  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const d=Math.hypot(-S2+i*cs-x,-S2+j*cs-z);if(d>=R)continue;const w=.5*(1+Math.cos(Math.PI*d/R)),k=j*K+i,b0=t.h0[k]+t.dl[k];let nv=t.pd[k]+amt*w;nv=Math.max(-ED_MAX-t.dl[k],Math.min(ED_MAX-t.dl[k],nv));nv=Math.max(ED_MIN_E-b0,Math.min(ED_MAX_E-b0,nv));t.pd[k]=nv;t.h[k]=b0+nv}
- const bb=[Math.max(0,i0-2),Math.max(0,j0-2),Math.min(K-1,i1+2),Math.min(K-1,j1+2)],lim=ED_TALUS*cs*10;
+ return tRelax(t,i0,j0,i1,j1)}
+/* 急傾斜の制限(talus): pdを持つ頂点だけを、近傍との標高差が「元の差」と上限(ED_TALUS)の大きい方を超えないように戻す。全ブラシ共通 */
+function tRelax(t,i0,j0,i1,j1){const K=t.k,cs=t.cs,bb=[Math.max(0,i0-2),Math.max(0,j0-2),Math.min(K-1,i1+2),Math.min(K-1,j1+2)],lim=ED_TALUS*cs*10;
  for(let it=0;it<2;it++)for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i;if(!t.pd[k])continue;const b0=t.h0[k]+t.dl[k];
   for(const nk of [i>0?k-1:-1,i<K-1?k+1:-1,j>0?k-K:-1,j<K-1?k+K:-1]){if(nk<0)continue;const diff=t.h[k]-t.h[nk],al=Math.max(lim,Math.abs(b0-(t.h0[nk]+t.dl[nk])));if(diff>al)t.pd[k]-=(diff-al)*.5;else if(diff<-al)t.pd[k]+=(-diff-al)*.5;t.h[k]=b0+t.pd[k]}}
  return bb}
+/* v0.3.1 整形ブラシ(目標高さTに向けて (T-h)*減衰w*効き具合 だけ pd に加算)。近傍参照はスタンプ開始時のスナップショットを使う。
+   smooth: T=3×3重み付き平均(局所的な凹凸だけを落とす) / flat: T=ストローク開始時の高さ / slope: T=ブラシ内の重み付き最小二乗平面(平均高さは保持、傾きは目標勾配以下に制限) */
+function tStampX(t,x,z,R,mode,str,ref){const K=t.k,cs=t.cs,S2=t.size/2;if(!t.pd)t.pd=new Float32Array(K*K);
+ const i0=Math.max(0,Math.floor((x-R+S2)/cs)),i1=Math.min(K-1,Math.ceil((x+R+S2)/cs)),j0=Math.max(0,Math.floor((z-R+S2)/cs)),j1=Math.min(K-1,Math.ceil((z+R+S2)/cs));
+ const a0=Math.max(0,i0-1),a1=Math.min(K-1,i1+1),c0=Math.max(0,j0-1),c1=Math.min(K-1,j1+1),W=a1-a0+1,Hs=new Float32Array(W*(c1-c0+1));
+ for(let j=c0;j<=c1;j++)for(let i=a0;i<=a1;i++)Hs[(j-c0)*W+(i-a0)]=t.h[j*K+i];
+ const hs=(i,j)=>Hs[(Math.min(c1,Math.max(c0,j))-c0)*W+(Math.min(a1,Math.max(a0,i))-a0)];
+ const wt=(i,j)=>{const d=Math.hypot(-S2+i*cs-x,-S2+j*cs-z);return d>=R?0:.5*(1+Math.cos(Math.PI*d/R))};
+ let gx=0,gz=0,mh=0,mx=0,mz=0;
+ if(mode==='slope'){let sw=0,sx=0,sz=0,sh=0;
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const w=wt(i,j);if(!w)continue;sw+=w;sx+=w*(-S2+i*cs-x)*10;sz+=w*(-S2+j*cs-z)*10;sh+=w*hs(i,j)}
+  if(sw>0){mx=sx/sw;mz=sz/sw;mh=sh/sw;let cxx=0,cxz=0,czz=0,cxh=0,czh=0;
+   for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const w=wt(i,j);if(!w)continue;const dx=(-S2+i*cs-x)*10-mx,dz=(-S2+j*cs-z)*10-mz,dh=hs(i,j)-mh;cxx+=w*dx*dx;cxz+=w*dx*dz;czz+=w*dz*dz;cxh+=w*dx*dh;czh+=w*dz*dh}
+   const det=cxx*czz-cxz*cxz;if(det>1e-6){gx=(cxh*czz-czh*cxz)/det;gz=(czh*cxx-cxh*cxz)/det}
+   const tg=Math.max(.1,.7-.06*str),gm=Math.hypot(gx,gz);if(gm>tg){gx*=tg/gm;gz*=tg/gm}}}
+ const kf=mode==='smooth'?Math.min(1,.09*str):mode==='flat'?Math.min(1,.12*str+.08):.1+.04*str,rf=ref==null?tSample(t,x,z):ref;
+ for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const w=wt(i,j);if(!w)continue;const k=j*K+i,h=hs(i,j),bk=t.h0[k]+t.dl[k];let T;
+  if(mode==='smooth')T=(4*h+2*(hs(i-1,j)+hs(i+1,j)+hs(i,j-1)+hs(i,j+1))+hs(i-1,j-1)+hs(i+1,j-1)+hs(i-1,j+1)+hs(i+1,j+1))/16;
+  else if(mode==='flat')T=rf;
+  else T=mh+gx*((-S2+i*cs-x)*10-mx)+gz*((-S2+j*cs-z)*10-mz);
+  let nv=t.pd[k]+(T-h)*w*kf;nv=Math.max(-ED_MAX-t.dl[k],Math.min(ED_MAX-t.dl[k],nv));nv=Math.max(ED_MIN_E-bk,Math.min(ED_MAX_E-bk,nv));t.pd[k]=nv;t.h[k]=bk+nv}
+ return tRelax(t,i0,j0,i1,j1)}
+function emApply(t,x,z,R,amt){const m=EM.tool;if(m==='dig'||m==='raise')return tStamp(t,x,z,R,amt);return tStampX(t,x,z,R,m,EM.str,EM.ref)}
 function tCancel(t,bb){if(!t.pd)return;const K=t.k;for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i;t.pd[k]=0;t.h[k]=t.h0[k]+t.dl[k]}}
 function tCommit(t,bb){if(!t.pd)return null;const K=t.k,idx=[],bf=[],af=[];let i0=K,j0=K,i1=-1,j1=-1;
  for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i,v=t.pd[k];if(v>.05||v<-.05){const nv=Math.max(-ED_MAX,Math.min(ED_MAX,Math.round((t.dl[k]+v)*10)/10));idx.push(k);bf.push(t.dl[k]);af.push(nv);t.dl[k]=nv;if(i<i0)i0=i;if(i>i1)i1=i;if(j<j0)j0=j;if(j>j1)j1=j}t.pd[k]=0;t.h[k]=t.h0[k]+t.dl[k]}
@@ -586,7 +611,7 @@ function tRay(t,o,v,maxT,st){const S=t.size/2;let prev=0;for(let s=0;s<maxT;s+=s
   if(y<=yOf(t,tSample(t,x,z))){let a=prev,b=s;for(let n=0;n<10;n++){const m=(a+b)/2;if(o.y+v.y*m<=yOf(t,tSample(t,o.x+v.x*m,o.z+v.z*m)))b=m;else a=m}const f=(a+b)/2;return{x:o.x+v.x*f,z:o.z+v.z*f}}prev=s}return null}
 
 /* [UI・描画連携層] */
-const EM={on:false,tool:'dig',size:40,str:5,stack:[],redo:[],stroking:false,last:null,pick:null,pb:null,cols:null,ring:null};
+const EM={on:false,tool:'dig',rc:{dig:0xff6a3d,raise:0x3da5ff,smooth:0x4cd18a,flat:0xffd23d,slope:0xb06cff},ref:null,size:40,str:5,stack:[],redo:[],stroking:false,last:null,pick:null,pb:null,cols:null,ring:null};
 function emReset(){EM.on=false;EM.stack=[];EM.redo=[];EM.pb=null;EM.stroking=false;EM.last=null;EM.pick=null}
 function emGfx(){if(EM.cols)return;EM.cols=[new THREE.Color(0xff6a3d),new THREE.Color(0x3da5ff)];const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(49*3),3));EM.ring=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff6a3d,depthTest:false,transparent:true}));EM.ring.frustumCulled=false;EM.ring.renderOrder=10;EM.ring.visible=false;MV.sc.add(EM.ring)}
 function mvRay(cx,cy){const r=MV.cv.getBoundingClientRect(),nx=(cx-r.left)/r.width*2-1,ny=-((cy-r.top)/r.height*2-1);mvCam();MV.cam.updateMatrixWorld();const o=MV.cam.position,v=new THREE.Vector3(nx,ny,.5).unproject(MV.cam).sub(o).normalize();return{o:{x:o.x,y:o.y,z:o.z},v:{x:v.x,y:v.y,z:v.z}}}
@@ -597,13 +622,13 @@ function mvInstances(t,b){const d=new THREE.Object3D(),S=t.size,cs=t.cs,K=t.k,bb
  run(MV.imT,t.trees,0);run(MV.imR,t.rocks,1)}
 function mvEditRefresh(t,b,commit){if(!MV.geo||MV.t!==t)return;const K=t.k,p=MV.geo.attributes.position;for(let j=b[1];j<=b[3];j++)for(let i=b[0];i<=b[2];i++)p.setY(j*K+i,yOf(t,t.h[j*K+i]));p.needsUpdate=true;
  const m=commit?3:1;mvColor(G&&G.wx?G.wx.depth:0,[Math.max(0,b[0]-m),Math.max(0,b[1]-m),Math.min(K-1,b[2]+m),Math.min(K-1,b[3]+m)]);mvInstances(t,b);if(commit)MV.geo.computeBoundingSphere();mvDraw()}
-function emRingUpdate(p){const g=EM.ring;if(!g)return;if(!p||!EM.on||EM.tool==='view'){g.visible=false;mvDraw();return}const t=MV.t,a=g.geometry.attributes.position;for(let n=0;n<=48;n++){const q=n/48*Math.PI*2,x=p.x+Math.cos(q)*EM.size,z=p.z+Math.sin(q)*EM.size;a.setXYZ(n,x,yOf(t,tSample(t,x,z))+2,z)}a.needsUpdate=true;g.material.color.copy(EM.cols[EM.tool==='dig'?0:1]);g.visible=true;mvDraw()}
+function emRingUpdate(p){const g=EM.ring;if(!g)return;if(!p||!EM.on||EM.tool==='view'){g.visible=false;mvDraw();return}const t=MV.t,a=g.geometry.attributes.position;for(let n=0;n<=48;n++){const q=n/48*Math.PI*2,x=p.x+Math.cos(q)*EM.size,z=p.z+Math.sin(q)*EM.size;a.setXYZ(n,x,yOf(t,tSample(t,x,z))+2,z)}a.needsUpdate=true;g.material.color.setHex(EM.rc[EM.tool]||0xffffff);g.visible=true;mvDraw()}
 function emUnion(a,b){return a?[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])]:b}
 function emStampAt(p){const t=MV.t,R=EM.size,amt=(EM.tool==='dig'?-1:1)*EM.str*.8,sp=Math.max(t.cs*.8,R*.3);let pts=[];
  if(!EM.last)pts=[p];else{const dx=p.x-EM.last.x,dz=p.z-EM.last.z,L=Math.hypot(dx,dz);if(L<sp)return;const n=Math.min(12,Math.floor(L/sp));for(let i=1;i<=n;i++)pts.push({x:EM.last.x+dx*i*sp/L,z:EM.last.z+dz*i*sp/L})}
- let bb=null;for(const q of pts){bb=emUnion(bb,tStamp(t,q.x,q.z,R,amt));EM.last=q}
+ let bb=null;for(const q of pts){bb=emUnion(bb,emApply(t,q.x,q.z,R,amt));EM.last=q}
  EM.pb=emUnion(EM.pb,bb);mvEditRefresh(t,bb,false);emRefresh()}
-function emDown(e,P){if(!EM.on||!MV.t)return;if(P.size>1){EM.stroking=false;EM.last=null;return}if(EM.tool==='view'||(e.pointerType==='mouse'&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;EM.stroking=true;EM.last=null;EM.pick=p;emStampAt(p);emRingUpdate(p)}
+function emDown(e,P){if(!EM.on||!MV.t)return;if(P.size>1){EM.stroking=false;EM.last=null;return}if(EM.tool==='view'||(e.pointerType==='mouse'&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;EM.stroking=true;EM.last=null;EM.pick=p;EM.ref=tSample(MV.t,p.x,p.z);emStampAt(p);emRingUpdate(p)}
 function emMove(e,P,dx,dy){if(!EM.on||!EM.stroking||P.size!==1)return false;const p=mvPick(e.clientX,e.clientY);if(p){EM.pick=p;emStampAt(p);emRingUpdate(p)}return true}
 function emUp(e,P){if(EM.stroking&&P.size<=1){EM.stroking=false;EM.last=null;emRefresh()}}
 function emHover(e){if(!EM.on||EM.tool==='view'||!MV.t)return;const p=mvPick(e.clientX,e.clientY);EM.pick=p;emRingUpdate(p)}
@@ -613,10 +638,10 @@ function emCommit(){const t=MV.t;if(!t||!EM.pb)return;const pt=tCommit(t,EM.pb),
 function emUndo(){const t=MV.t;if(!t)return;if(EM.pb){emCancel();return}const p=EM.stack.pop();if(!p)return;EM.redo.push(p);const bb=tApplyPatch(t,p,false);emSave(t);mvEditRefresh(t,bb,true);emRefresh()}
 function emRedo(){const t=MV.t;if(!t)return;const p=EM.redo.pop();if(!p)return;EM.stack.push(p);const bb=tApplyPatch(t,p,true);emSave(t);mvEditRefresh(t,bb,true);emRefresh()}
 function emTool(v){EM.tool=v;if(EM.stroking){EM.stroking=false;EM.last=null}if(MV.cv)MV.cv.style.cursor=v==='view'?'grab':'crosshair';emRingUpdate(v==='view'?null:EM.pick);emRefresh()}
-function emPanel(){return `<div class="empanel" id="empanel"><div class="emh"><b>地形編集</b><span id="em-st" class="note"></span></div><div class="seg emseg"><button class="btn" data-e="tool" data-v="dig">掘削</button><button class="btn" data-e="tool" data-v="raise">隆起</button><button class="btn" data-e="tool" data-v="view">視点移動</button></div><label class="emr"><span>ブラシサイズ <b id="em-szv"></b></span><input type="range" id="em-size" min="15" max="100" value="${EM.size}"></label><label class="emr"><span>加工強度 <b id="em-stv"></b></span><input type="range" id="em-str" min="1" max="10" value="${EM.str}"></label><div class="emb"><button class="btn p" data-e="commit" id="em-c">確定</button><button class="btn" data-e="cancel" id="em-x">キャンセル</button><button class="btn" data-e="undo" id="em-u">元に戻す</button><button class="btn" data-e="redo" id="em-r">やり直す</button><button class="btn" data-e="exit">編集終了</button></div><p class="emn">一本指(マウスは左ドラッグ)で加工。二本指・右ドラッグ・「視点移動」で画面を操作。確定した変更だけが保存されます。工事費・区画指定は今後追加予定です。</p></div>`}
+function emPanel(){return `<div class="empanel" id="empanel"><div class="emh"><b>地形編集</b><span id="em-st" class="note"></span></div><div class="seg emseg"><button class="btn" data-e="tool" data-v="dig">掘削</button><button class="btn" data-e="tool" data-v="raise">隆起</button><button class="btn" data-e="tool" data-v="smooth">平滑化</button><button class="btn" data-e="tool" data-v="flat">平坦化</button><button class="btn" data-e="tool" data-v="slope">斜面調整</button><button class="btn" data-e="tool" data-v="view">視点移動</button></div><p class="emn" id="em-h"></p><label class="emr"><span>ブラシサイズ <b id="em-szv"></b></span><input type="range" id="em-size" min="15" max="100" value="${EM.size}"></label><label class="emr"><span>加工強度 <b id="em-stv"></b></span><input type="range" id="em-str" min="1" max="10" value="${EM.str}"></label><div class="emb"><button class="btn p" data-e="commit" id="em-c">確定</button><button class="btn" data-e="cancel" id="em-x">キャンセル</button><button class="btn" data-e="undo" id="em-u">元に戻す</button><button class="btn" data-e="redo" id="em-r">やり直す</button><button class="btn" data-e="exit">編集終了</button></div><p class="emn">一本指(マウスは左ドラッグ)で加工。二本指・右ドラッグ・「視点移動」で画面を操作。確定した変更だけが保存されます。工事費・区画指定は今後追加予定です。</p></div>`}
 function emRefresh(){const t=MV.t,q=s=>document.getElementById(s);if(!q('empanel'))return;
  document.querySelectorAll('#empanel [data-e=tool]').forEach(b=>b.classList.toggle('on',b.dataset.v===EM.tool));
- q('em-szv').textContent='半径 '+EM.size*10+' m';q('em-stv').textContent=EM.str;
+ q('em-szv').textContent='半径 '+EM.size*10+' m';q('em-stv').textContent=EM.str;{const hh=q('em-h');if(hh)hh.textContent=({dig:'なぞった所を削ります',raise:'なぞった所を盛り上げます',smooth:'細かな凹凸をなだらかにします',flat:'最初にタッチした高さに揃えて平らにします',slope:'斜面の傾きを整え、急すぎる斜面を緩やかにします(強度が高いほど緩やか)',view:'画面の移動(加工はしません)'})[EM.tool]||''}
  let n=0,mx=0;if(EM.pb&&t&&t.pd){const b=EM.pb,K=t.k;for(let j=b[1];j<=b[3];j++)for(let i=b[0];i<=b[2];i++){const v=Math.abs(t.pd[j*K+i]);if(v>.5){n++;if(v>mx)mx=v}}}
  q('em-st').textContent=n?'未確定 '+n+'点 最大'+Math.round(mx)+'m':(EM.stack.length?'確定済み '+EM.stack.length+' 件':'');
  q('em-c').disabled=!n;q('em-x').disabled=!n;q('em-u').disabled=!(n||EM.stack.length);q('em-r').disabled=!EM.redo.length}
@@ -668,7 +693,7 @@ document.addEventListener("click",ev=>{
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.3.0</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.3.1</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
