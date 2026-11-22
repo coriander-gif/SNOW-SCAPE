@@ -478,6 +478,9 @@ function tInitEdit(t,ed){
  t.deadTrees = new Uint8Array(t.k * t.k);
  if(G && G.map.deadRocks) G.map.deadRocks.forEach(k => t.deadRocks[k] = 1);
  if(G && G.map.deadTrees) G.map.deadTrees.forEach(k => t.deadTrees[k] = 1);
+
+ if(ed){const d=edDec(ed,t.k*t.k);if(d){for(let k=0;k<d.length;k++){const e=Math.max(ED_MIN_E,Math.min(ED_MAX_E,t.h0[k]+d[k]));t.dl[k]=e-t.h0[k];t.h[k]=e}tReclass(t,0,0,t.k-1,t.k-1);tStats(t)}else{t.ed='';toast('地形の編集データを読み込めなかったため、元の地形を表示します')}}
+
  if(G && G.works) {
   const activeWorks = G.works.filter(w => w.state === "施工中" && w.patch);
   activeWorks.forEach(w => {
@@ -487,7 +490,7 @@ function tInitEdit(t,ed){
   });
   G.works = []; if(activeWorks.length > 0) emSave(t);
  }
- if(ed){const d=edDec(ed,t.k*t.k);if(d){for(let k=0;k<d.length;k++){const e=Math.max(ED_MIN_E,Math.min(ED_MAX_E,t.h0[k]+d[k]));t.dl[k]=e-t.h0[k];t.h[k]=e}tReclass(t,0,0,t.k-1,t.k-1);tStats(t)}else{t.ed='';toast('地形の編集データを読み込めなかったため、元の地形を表示します')}}}
+}
 function tReclass(t,i0,j0,i1,j1){const N=t.n,K=t.k,E=t.h,HM=t.cs*10,ce=t.cellElev,sl=t.cellSlope,ty=t.cellType,dv=t.cellDev,md=t.cellMod,base=t.base,rel=t.rel,cl=t.cls;
  const ci0=Math.max(0,i0-1),cj0=Math.max(0,j0-1),ci1=Math.min(N-1,i1),cj1=Math.min(N-1,j1);
  for(let j=cj0;j<=cj1;j++)for(let i=ci0;i<=ci1;i++){const a=j*K+i,b=a+1,c=a+K,d=c+1,q=j*N+i;ce[q]=(E[a]+E[b]+E[c]+E[d])/4;sl[q]=Math.hypot((E[b]+E[d]-E[a]-E[c])/(2*HM),(E[c]+E[d]-E[a]-E[b])/(2*HM))}
@@ -616,6 +619,7 @@ function emSaveSnapshot() {
   const t = MV.t;
   if (!t) return null;
   return {
+    type: 'preview',
     pd: t.pd ? new Float32Array(t.pd) : null,
     rd: t.rd ? new Uint8Array(t.rd) : null,
     td: t.td ? new Uint8Array(t.td) : null,
@@ -636,44 +640,94 @@ function pushSnapshot() {
   EM.redo = [];
   emRefresh();
 }
-function emRestoreSnapshot(t, snap) {
-  if (t.pd || t.rd || t.td) tCancel(t, [0,0,t.k-1,t.k-1]);
-  t.pd = snap.pd ? new Float32Array(snap.pd) : null;
-  t.rd = snap.rd ? new Uint8Array(snap.rd) : null;
-  t.td = snap.td ? new Uint8Array(snap.td) : null;
-  EM.pb = snap.pb ? [...snap.pb] : null;
-  if (snap.sel) {
-    if(!EM.sel) EM.sel = new Uint8Array(t.k*t.k);
-    EM.sel.set(snap.sel);
-  } else {
-    EM.sel = null;
-  }
-  EM.selN = snap.selN || 0;
-  EM.selBB = snap.selBB ? [...snap.selBB] : null;
-  EM.op = snap.op;
-  if (snap.copt) EM.copt = snap.copt;
-  if (snap.rvs) EM.rvs = {...snap.rvs};
-  
-  if (t.pd) {
-    for (let k = 0; k < t.k * t.k; k++) {
-      if (t.pd[k] !== 0) t.h[k] = t.h0[k] + t.dl[k] + t.pd[k];
+function emRestoreSnapshot(t, snap, isRedo) {
+  if (snap.type === 'commit') {
+    const fwd = isRedo;
+    if (fwd) {
+      if (G.funds < snap.cost) {
+        toast("資金が不足しているため、やり直せません");
+        return false;
+      }
+      G.funds -= snap.cost;
+      tApplyPatch(t, snap.pt, true);
+      const histItem = {
+        id: snap.histId,
+        name: snap.name || "造成工事",
+        area: snap.area || 0, vol: snap.vol || 0, rockArea: snap.rockArea || 0, treeArea: snap.treeArea || 0,
+        cost: snap.cost, startDate: G.date, endDate: G.date, state: "完了"
+      };
+      if (!G.history) G.history = [];
+      G.history.push(histItem);
+    } else {
+      G.funds += snap.cost;
+      tApplyPatch(t, snap.pt, false);
+      if (G.history) {
+        G.history = G.history.filter(h => h.id !== snap.histId);
+      }
     }
+    emSave(t); saveGame(true);
+    mvEditRefresh(t, snap.pt.bb, true);
+    upd();
+    return true;
+  } else {
+    if (t.pd || t.rd || t.td) tCancel(t, [0,0,t.k-1,t.k-1]);
+    t.pd = snap.pd ? new Float32Array(snap.pd) : null;
+    t.rd = snap.rd ? new Uint8Array(snap.rd) : null;
+    t.td = snap.td ? new Uint8Array(snap.td) : null;
+    EM.pb = snap.pb ? [...snap.pb] : null;
+    if (snap.sel) {
+      if(!EM.sel) EM.sel = new Uint8Array(t.k*t.k);
+      EM.sel.set(snap.sel);
+    } else {
+      EM.sel = null;
+    }
+    EM.selN = snap.selN || 0;
+    EM.selBB = snap.selBB ? [...snap.selBB] : null;
+    EM.op = snap.op;
+    if (snap.copt) EM.copt = snap.copt;
+    if (snap.rvs) EM.rvs = {...snap.rvs};
+    
+    if (t.pd) {
+      for (let k = 0; k < t.k * t.k; k++) {
+        if (t.pd[k] !== 0) t.h[k] = t.h0[k] + t.dl[k] + t.pd[k];
+      }
+    }
+    mvEditRefresh(t, EM.pb || [0,0,t.k-1,t.k-1], false);
+    emColorBB(EM.selBB || [0,0,t.k-1,t.k-1]);
+    return true;
   }
-  mvEditRefresh(t, EM.pb || [0,0,t.k-1,t.k-1], false);
-  emColorBB(EM.selBB || [0,0,t.k-1,t.k-1]);
 }
 function emUndo(){
   const t = MV.t;
   if(!t || EM.stack.length === 0) return;
-  EM.redo.push(emSaveSnapshot());
-  emRestoreSnapshot(t, EM.stack.pop());
+  const snap = EM.stack.pop();
+  if (snap.type === 'commit') {
+    if(EM.pb) emCancel();
+    emRestoreSnapshot(t, snap, false);
+    EM.redo.push(snap);
+  } else {
+    const currentSnap = emSaveSnapshot();
+    if(currentSnap) EM.redo.push(currentSnap);
+    emRestoreSnapshot(t, snap, false);
+  }
   emRefresh();
 }
 function emRedo(){
   const t = MV.t;
   if(!t || EM.redo.length === 0) return;
-  EM.stack.push(emSaveSnapshot());
-  emRestoreSnapshot(t, EM.redo.pop());
+  const snap = EM.redo.pop();
+  if (snap.type === 'commit') {
+    if(EM.pb) emCancel();
+    if (emRestoreSnapshot(t, snap, true)) {
+      EM.stack.push(snap);
+    } else {
+      EM.redo.push(snap);
+    }
+  } else {
+    const currentSnap = emSaveSnapshot();
+    if(currentSnap) EM.stack.push(currentSnap);
+    emRestoreSnapshot(t, snap, true);
+  }
   emRefresh();
 }
 
@@ -692,7 +746,13 @@ function emSave(t){
   if(dt.length>0)G.map.deadTrees=dt;else delete G.map.deadTrees;
  }
 }
-function emCancel(){EM.pvOn=false;const t=MV.t;if(!t||!EM.pb)return;const bb=EM.pb;tCancel(t,bb);EM.pb=null;EM.stack=[];EM.redo=[];mvEditRefresh(t,bb,false);emRefresh()}
+function emCancel(){
+  EM.pvOn=false;const t=MV.t;if(!t||!EM.pb)return;
+  const bb=EM.pb;tCancel(t,bb);EM.pb=null;
+  EM.stack=EM.stack.filter(s=>s.type==='commit');
+  EM.redo=EM.redo.filter(s=>s.type==='commit');
+  mvEditRefresh(t,bb,false);emRefresh()
+}
 
 // 工事費用計算
 function emCalcCost(t, bb) {
@@ -733,18 +793,34 @@ function emCommit(){
  const pt=tCommitPreview(t,EM.pb), bb=EM.pb; EM.pb=null;
  if(!pt){ mvEditRefresh(t,bb,false);emRefresh();return; }
  
+ const commitSnap = {
+   type: 'commit',
+   pt: pt,
+   cost: stat.cost,
+   histId: "W_" + Date.now(),
+   name: EM.mode === 'region' ? (EM.op==='clear'?"障害物除去(区画)":"造成工事(区画)") : (EM.tool==='clear'?"障害物除去(ブラシ)":"造成工事(ブラシ)"),
+   area: stat.area,
+   vol: stat.digVol + stat.fillVol,
+   rockArea: stat.rockArea,
+   treeArea: stat.treeArea
+ };
+ 
  G.funds -= stat.cost;
  tApplyPatch(t, pt, true);
  G.history = G.history || [];
  G.history.push({
-  id: "W_" + Date.now(),
-  name: EM.mode === 'region' ? (EM.op==='clear'?"障害物除去(区画)":"造成工事(区画)") : (EM.tool==='clear'?"障害物除去(ブラシ)":"造成工事(ブラシ)"),
-  area: stat.area, vol: stat.digVol + stat.fillVol, rockArea: stat.rockArea, treeArea: stat.treeArea,
-  cost: stat.cost, startDate: G.date, endDate: G.date, state: "完了"
+  id: commitSnap.histId,
+  name: commitSnap.name,
+  area: commitSnap.area, vol: commitSnap.vol, rockArea: commitSnap.rockArea, treeArea: commitSnap.treeArea,
+  cost: commitSnap.cost, startDate: G.date, endDate: G.date, state: "完了"
  });
  
  emSave(t); saveGame(true);
- EM.stack=[]; EM.redo=[];
+ 
+ EM.stack.push(commitSnap);
+ if(EM.stack.length > 30) EM.stack.shift();
+ EM.redo = [];
+ 
  mvEditRefresh(t, bb, true); emRefresh(); upd();
  toast("地形造成工事が完了しました");
 }
@@ -992,3 +1068,4 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")$("#modal").hidden=t
 </script>
 </body>
 </html>
+```eof
