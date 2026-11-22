@@ -442,13 +442,14 @@ function edEnc(dl){const n=dl.length,u=new Int16Array(n);let any=false;for(let i
 function edDec(str,n){try{const s=atob(str);if(s.length!==n*2)return null;const b=new Uint8Array(n*2);for(let i=0;i<b.length;i++)b[i]=s.charCodeAt(i);const u=new Int16Array(b.buffer),o=new Float32Array(n);for(let i=0;i<n;i++)o[i]=Math.max(-ED_MAX,Math.min(ED_MAX,u[i]));return o}catch(e){return null}}
 function tStats(t){let mn=1e9,mx=0;for(let k=0;k<t.h.length;k++){const v=t.h[k];if(v<mn)mn=v;if(v>mx)mx=v}t.emin=Math.round(mn);t.emax=Math.round(mx)}
 function tInitEdit(t,ed){
- t.h0=Float32Array.from(t.h);t.dl=new Float32Array(t.k*t.k);t.pd=null;t.ed=ed||'';
+ t.h0=Float32Array.from(t.h);t.dl=new Float32Array(t.k*t.k);t.pd=null; t.rd=null; t.ed=ed||'';
  t.locks = new Uint8Array(t.k * t.k);
  t.deadRocks = new Uint8Array(t.k * t.k);
  if(G && G.map.deadRocks) G.map.deadRocks.forEach(k => t.deadRocks[k] = 1);
  if(G && G.works) G.works.forEach(w => {
-  if (w.state === "施工中" && w.patch && w.patch.idx) {
-   for (let i = 0; i < w.patch.idx.length; i++) t.locks[w.patch.idx[i]] = 1;
+  if (w.state === "施工中" && w.patch) {
+   if (w.patch.idx) for (let i = 0; i < w.patch.idx.length; i++) t.locks[w.patch.idx[i]] = 1;
+   if (w.patch.ridx) for (let i = 0; i < w.patch.ridx.length; i++) t.locks[w.patch.ridx[i]] = 1;
   }
  });
  if(ed){const d=edDec(ed,t.k*t.k);if(d){for(let k=0;k<d.length;k++){const e=Math.max(ED_MIN_E,Math.min(ED_MAX_E,t.h0[k]+d[k]));t.dl[k]=e-t.h0[k];t.h[k]=e}tReclass(t,0,0,t.k-1,t.k-1);tStats(t)}else{t.ed='';toast('地形の編集データを読み込めなかったため、元の地形を表示します')}}}
@@ -471,10 +472,12 @@ function tStamp(t,x,z,R,amt){const K=t.k,cs=t.cs,S2=t.size/2;if(!t.pd)t.pd=new F
  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*K+i;if(t.locks[k])continue;const d=Math.hypot(-S2+i*cs-x,-S2+j*cs-z);if(d>=R)continue;const w=.5*(1+Math.cos(Math.PI*d/R)),b0=t.h0[k]+t.dl[k];let nv=t.pd[k]+amt*w;nv=Math.max(-ED_MAX-t.dl[k],Math.min(ED_MAX-t.dl[k],nv));nv=Math.max(ED_MIN_E-b0,Math.min(ED_MAX_E-b0,nv));t.pd[k]=nv;t.h[k]=b0+nv}
  return tRelax(t,i0,j0,i1,j1)}
 function tRelax(t,i0,j0,i1,j1){const K=t.k,cs=t.cs,bb=[Math.max(0,i0-2),Math.max(0,j0-2),Math.min(K-1,i1+2),Math.min(K-1,j1+2)],lim=ED_TALUS*cs*10;
+ if(!t.pd) return bb;
  for(let it=0;it<2;it++)for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i;if(!t.pd[k] || t.locks[k])continue;const b0=t.h0[k]+t.dl[k];
   for(const nk of [i>0?k-1:-1,i<K-1?k+1:-1,j>0?k-K:-1,j<K-1?k+K:-1]){if(nk<0)continue;const diff=t.h[k]-t.h[nk],al=Math.max(lim,Math.abs(b0-(t.h0[nk]+t.dl[nk])));if(diff>al)t.pd[k]-=(diff-al)*.5;else if(diff<-al)t.pd[k]+=(-diff-al)*.5;t.h[k]=b0+t.pd[k]}}
  return bb}
 function tStampX(t,x,z,R,mode,str,ref){const K=t.k,cs=t.cs,S2=t.size/2;if(!t.pd)t.pd=new Float32Array(K*K);
+ if(mode==='rock'&&!t.rd)t.rd=new Uint8Array(K*K);
  const i0=Math.max(0,Math.floor((x-R+S2)/cs)),i1=Math.min(K-1,Math.ceil((x+R+S2)/cs)),j0=Math.max(0,Math.floor((z-R+S2)/cs)),j1=Math.min(K-1,Math.ceil((z+R+S2)/cs));
  const a0=Math.max(0,i0-1),a1=Math.min(K-1,i1+1),c0=Math.max(0,j0-1),c1=Math.min(K-1,j1+1),W=a1-a0+1,Hs=new Float32Array(W*(c1-c0+1));
  for(let j=c0;j<=c1;j++)for(let i=a0;i<=a1;i++)Hs[(j-c0)*W+(i-a0)]=t.h[j*K+i];
@@ -487,32 +490,32 @@ function tStampX(t,x,z,R,mode,str,ref){const K=t.k,cs=t.cs,S2=t.size/2;if(!t.pd)
    for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*K+i;if(t.locks[k])continue;const w=wt(i,j);if(!w)continue;const dx=(-S2+i*cs-x)*10-mx,dz=(-S2+j*cs-z)*10-mz,dh=hs(i,j)-mh;cxx+=w*dx*dx;cxz+=w*dx*dz;czz+=w*dz*dz;cxh+=w*dx*dh;czh+=w*dz*dh}
    const det=cxx*czz-cxz*cxz;if(det>1e-6){gx=(cxh*czz-czh*cxz)/det;gz=(czh*cxx-cxh*cxz)/det}
    const tg=Math.max(.1,.7-.06*str),gm=Math.hypot(gx,gz);if(gm>tg){gx*=tg/gm;gz*=tg/gm}}}
- const kf=mode==='smooth'||mode==='rock'?Math.min(1,.09*str):mode==='flat'?Math.min(1,.12*str+.08):.1+.04*str,rf=ref==null?tSample(t,x,z):ref;
- for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*K+i;if(t.locks[k])continue;const w=wt(i,j);if(!w)continue;const h=hs(i,j),bk=t.h0[k]+t.dl[k];let T;
-  if(mode==='smooth'||mode==='rock')T=(4*h+2*(hs(i-1,j)+hs(i+1,j)+hs(i,j-1)+hs(i,j+1))+hs(i-1,j-1)+hs(i+1,j-1)+hs(i-1,j+1)+hs(i+1,j+1))/16;
+ const kf=mode==='smooth'?Math.min(1,.09*str):mode==='flat'?Math.min(1,.12*str+.08):.1+.04*str,rf=ref==null?tSample(t,x,z):ref;
+ for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*K+i;if(t.locks[k])continue;const w=wt(i,j);if(!w)continue;
+  if(mode==='rock'){if(w>0.1)t.rd[k]=1;continue;}
+  const h=hs(i,j),bk=t.h0[k]+t.dl[k];let T;
+  if(mode==='smooth')T=(4*h+2*(hs(i-1,j)+hs(i+1,j)+hs(i,j-1)+hs(i,j+1))+hs(i-1,j-1)+hs(i+1,j-1)+hs(i-1,j+1)+hs(i+1,j+1))/16;
   else if(mode==='flat')T=rf;
   else T=mh+gx*((-S2+i*cs-x)*10-mx)+gz*((-S2+j*cs-z)*10-mz);
   let nv=t.pd[k]+(T-h)*w*kf;
-  if(mode==='rock' && Math.abs(nv)<0.1) nv = -0.1; // 岩場除去をパッチに含めるための微小変更
   nv=Math.max(-ED_MAX-t.dl[k],Math.min(ED_MAX-t.dl[k],nv));nv=Math.max(ED_MIN_E-bk,Math.min(ED_MAX_E-bk,nv));t.pd[k]=nv;t.h[k]=bk+nv}
  return tRelax(t,i0,j0,i1,j1)}
 function emApply(t,x,z,R,amt){const m=EM.tool;if(m==='dig'||m==='raise')return tStamp(t,x,z,R,amt);return tStampX(t,x,z,R,m,EM.str,EM.ref)}
-function tCancel(t,bb){if(!t.pd)return;const K=t.k;for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i;t.pd[k]=0;t.h[k]=t.h0[k]+t.dl[k]}}
+function tCancel(t,bb){if(!t.pd&&!t.rd)return;const K=t.k;for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i;if(t.pd)t.pd[k]=0;if(t.rd)t.rd[k]=0;t.h[k]=t.h0[k]+t.dl[k]}}
 
 /* 工事パッチ作成 (tCommitを置き換え、即時反映しない) */
-function tCommitPreview(t,bb){if(!t.pd)return null;const K=t.k,idx=[],bf=[],af=[];let i0=K,j0=K,i1=-1,j1=-1;
- for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i,v=t.pd[k];
-  if(v>.05||v<-.05){const nv=Math.max(-ED_MAX,Math.min(ED_MAX,Math.round((t.dl[k]+v)*10)/10));idx.push(k);bf.push(t.dl[k]);af.push(nv);if(i<i0)i0=i;if(i>i1)i1=i;if(j<j0)j0=j;if(j>j1)j1=j}
-  t.pd[k]=0;t.h[k]=t.h0[k]+t.dl[k]}
- if(!idx.length)return null;const b=[Math.max(0,i0-2),Math.max(0,j0-2),Math.min(K-1,i1+2),Math.min(K-1,j1+2)];
- return{idx:Int32Array.from(idx),bf:Float32Array.from(bf),af:Float32Array.from(af),bb:b}}
+function tCommitPreview(t,bb){if(!t.pd&&!t.rd)return null;const K=t.k,idx=[],bf=[],af=[],ridx=[];let i0=K,j0=K,i1=-1,j1=-1;
+ for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i;let chg=false;
+  if(t.pd&&(t.pd[k]>.05||t.pd[k]<-.05)){const nv=Math.max(-ED_MAX,Math.min(ED_MAX,Math.round((t.dl[k]+t.pd[k])*10)/10));idx.push(k);bf.push(t.dl[k]);af.push(nv);chg=true;}
+  if(t.rd&&t.rd[k]&&!t.deadRocks[k]){ridx.push(k);chg=true;}
+  if(chg){if(i<i0)i0=i;if(i>i1)i1=i;if(j<j0)j0=j;if(j>j1)j1=j;}
+  if(t.pd)t.pd[k]=0;if(t.rd)t.rd[k]=0;t.h[k]=t.h0[k]+t.dl[k]}
+ if(!idx.length&&!ridx.length)return null;const b=[Math.max(0,i0-2),Math.max(0,j0-2),Math.min(K-1,i1+2),Math.min(K-1,j1+2)];
+ return{idx:Int32Array.from(idx),bf:Float32Array.from(bf),af:Float32Array.from(af),ridx:Int32Array.from(ridx),bb:b}}
 
 function tApplyPatch(t,p,fwd){
- const a=fwd?p.af:p.bf;
- for(let n=0;n<p.idx.length;n++){const k=p.idx[n];t.dl[k]=a[n];t.h[k]=t.h0[k]+t.dl[k]}
- if(fwd && p.isRockRemoval && t.deadRocks){
-  for(let n=0;n<p.idx.length;n++) t.deadRocks[p.idx[n]] = 1;
- }
+ if(p.idx){const a=fwd?p.af:p.bf;for(let n=0;n<p.idx.length;n++){const k=p.idx[n];t.dl[k]=a[n];t.h[k]=t.h0[k]+t.dl[k]}}
+ if(p.ridx&&t.deadRocks){for(let n=0;n<p.ridx.length;n++)t.deadRocks[p.ridx[n]]=fwd?1:0;}
  tReclass(t,p.bb[0],p.bb[1],p.bb[2],p.bb[3]);tStats(t);return p.bb}
 
 function tRay(t,o,v,maxT,st){const S=t.size/2;let prev=0;for(let s=0;s<maxT;s+=st){const x=o.x+v.x*s,z=o.z+v.z*s,y=o.y+v.y*s;if(Math.abs(x)>S||Math.abs(z)>S){if(y<-40)break;prev=s;continue}
@@ -524,7 +527,7 @@ function emGfx(){if(EM.cols)return;EM.cols=[new THREE.Color(0xff6a3d),new THREE.
 function mvRay(cx,cy){const r=MV.cv.getBoundingClientRect(),nx=(cx-r.left)/r.width*2-1,ny=-((cy-r.top)/r.height*2-1);mvCam();MV.cam.updateMatrixWorld();const o=MV.cam.position,v=new THREE.Vector3(nx,ny,.5).unproject(MV.cam).sub(o).normalize();return{o:{x:o.x,y:o.y,z:o.z},v:{x:v.x,y:v.y,z:v.z}}}
 function mvPick(cx,cy){const t=MV.t;if(!t||!MV.cv)return null;const q=mvRay(cx,cy);return tRay(t,q.o,q.v,MV.d*2.5+2000,Math.max(2,MV.d*.004))}
 function mvInstances(t,b){const d=new THREE.Object3D(),S=t.size,cs=t.cs,K=t.k,bb=b?[-S/2+b[0]*cs-cs,-S/2+b[1]*cs-cs,-S/2+b[2]*cs+cs,-S/2+b[3]*cs+cs]:null;
- const dead=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3 || (t.deadRocks && t.deadRocks[k]);};
+ const dead=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3 || (t.deadRocks && t.deadRocks[k]) || (t.rd && t.rd[k]);};
  const run=(im,arr,rk)=>{if(!im)return;for(let n=0;n<arr.length;n++){const q=arr[n];if(bb&&(q.x<bb[0]||q.x>bb[2]||q.z<bb[1]||q.z>bb[3]))continue;d.position.set(q.x,yOf(t,tSample(t,q.x,q.z))+(rk?q.s*.3:0),q.z);const s=dead(q)?0:q.s;d.scale.set(s,s*(rk?.7:1),s);d.updateMatrix();im.setMatrixAt(n,d.matrix)}im.instanceMatrix.needsUpdate=true};
  run(MV.imT,t.trees,0);run(MV.imR,t.rocks,1)}
 function mvEditRefresh(t,b,commit){if(!MV.geo||MV.t!==t)return;const K=t.k,p=MV.geo.attributes.position;for(let j=b[1];j<=b[3];j++)for(let i=b[0];i<=b[2];i++)p.setY(j*K+i,yOf(t,t.h[j*K+i]));p.needsUpdate=true;
@@ -551,22 +554,28 @@ function emCancel(){EM.pvOn=false;const t=MV.t;if(!t||!EM.pb)return;const bb=EM.
 // 工事費用計算
 function emCalcCost(t, bb) {
  let n = 0, mx = 0, digVol = 0, fillVol = 0, area = 0, rockArea = 0;
- if (!bb || !t || !t.pd) return {n:0, cost:0, days:0};
+ if (!bb || !t || (!t.pd && !t.rd)) return {n:0, cost:0, days:0};
  const K = t.k, csArea = (t.cs * 10) * (t.cs * 10);
  for(let j=bb[1]; j<=bb[3]; j++) for(let i=bb[0]; i<=bb[2]; i++){
-  const k = j*K+i, v = t.pd[k];
-  if (Math.abs(v) > 0.05) {
-   n++; if(Math.abs(v) > mx) mx = Math.abs(v);
+  const k = j*K+i;
+  let chg = false;
+  let pdv = t.pd ? t.pd[k] : 0;
+  if (Math.abs(pdv) > 0.05) {
+   n++; if(Math.abs(pdv) > mx) mx = Math.abs(pdv);
    area += csArea;
-   if (v < 0) digVol += -v * csArea; else fillVol += v * csArea;
-   const tIdx = Math.min(j, t.n-1)*t.n + Math.min(i, t.n-1);
-   if (t.cellType[tIdx] === 3 || t.cellMod[tIdx] === 1) rockArea += csArea;
+   if (pdv < 0) digVol += -pdv * csArea; else fillVol += pdv * csArea;
+   chg = true;
+  }
+  if (t.rd && t.rd[k] && !t.deadRocks[k]) {
+   if(!chg) n++; 
+   rockArea += csArea;
+   chg = true;
   }
  }
  if (n === 0) return {n:0, cost:0, days:0};
- const U_DIG = 1000, U_FILL = 1500, U_AREA = 300, U_ROCK = 5000;
+ const U_DIG = 150, U_FILL = 200, U_AREA = 100, U_ROCK = 500;
  const cost = Math.floor(digVol * U_DIG + fillVol * U_FILL + area * U_AREA + rockArea * U_ROCK);
- const days = Math.max(1, Math.floor(area / 2500 + (digVol + fillVol) / 1000 + rockArea / 400));
+ const days = Math.max(1, Math.floor(area / 3000 + (digVol + fillVol) / 4000 + rockArea / 1000));
  return {n, mx, area, digVol, fillVol, rockArea, cost, days};
 }
 
@@ -579,19 +588,18 @@ function emCommit(){
  const pt=tCommitPreview(t,EM.pb), bb=EM.pb; EM.pb=null;
  if(!pt){ mvEditRefresh(t,bb,false);emRefresh();return; }
  
- if (EM.mode === 'region' && EM.op === 'rock' || EM.mode === 'brush' && EM.tool === 'rock') pt.isRockRemoval = true;
- 
  G.funds -= stat.cost;
  G.works = G.works || [];
  G.works.push({
   id: "W_" + Date.now(),
   name: EM.mode === 'region' ? (EM.op==='rock'?"岩場除去(区画)":"造成工事(区画)") : (EM.tool==='rock'?"岩場除去(ブラシ)":"造成工事(ブラシ)"),
-  area: stat.area, vol: stat.digVol + stat.fillVol,
+  area: stat.area, vol: stat.digVol + stat.fillVol, rockArea: stat.rockArea,
   cost: stat.cost, daysTotal: stat.days, daysLeft: stat.days,
   startDate: G.date, state: "施工中", patch: pt
  });
  
- for(let i=0; i<pt.idx.length; i++) t.locks[pt.idx[i]] = 1;
+ if(pt.idx) for(let i=0; i<pt.idx.length; i++) t.locks[pt.idx[i]] = 1;
+ if(pt.ridx) for(let i=0; i<pt.ridx.length; i++) t.locks[pt.ridx[i]] = 1;
  emSave(t); saveGame(true);
  mvEditRefresh(t, bb, false); emRefresh(); upd();
  toast("地形造成工事を開始しました");
@@ -602,9 +610,17 @@ function emTool(v){EM.tool=v;if(EM.stroking){EM.stroking=false;EM.last=null}if(M
 function emPanel(){return `<div class="empanel" id="empanel"><div class="emh"><b>地形造成</b><span id="em-st" class="note"></span></div><div class="seg emmode"><button class="btn" data-e="mode" data-v="brush">自由ブラシ</button><button class="btn" data-e="mode" data-v="region">区画指定</button></div><div id="em-brush"><div class="seg emseg"><button class="btn" data-e="tool" data-v="dig">掘削</button><button class="btn" data-e="tool" data-v="raise">隆起</button><button class="btn" data-e="tool" data-v="smooth">平滑化</button><button class="btn" data-e="tool" data-v="flat">平坦化</button><button class="btn" data-e="tool" data-v="slope">斜面調整</button><button class="btn" data-e="tool" data-v="rock">岩場除去</button><button class="btn" data-e="tool" data-v="view">視点移動</button></div><p class="emn" id="em-h"></p><label class="emr"><span>ブラシサイズ <b id="em-szv"></b></span><input type="range" id="em-size" min="15" max="100" value="${EM.size}"></label><label class="emr"><span>加工強度 <b id="em-stv"></b></span><input type="range" id="em-str" min="1" max="10" value="${EM.str}"></label></div><div id="em-region" style="display:none"><div class="seg emseg2"><button class="btn" data-e="rtool" data-v="rect">矩形</button><button class="btn" data-e="rtool" data-v="paint">なぞり</button><button class="btn" data-e="rtool" data-v="view">視点移動</button></div><div class="seg emseg2"><button class="btn" id="em-add" data-e="radd">追加</button><button class="btn" id="em-sub" data-e="rsub">解除</button><button class="btn" data-e="rclear">選択クリア</button></div><p class="emn" id="em-sel"></p><label class="emr" id="em-sz2"><span>なぞりのサイズ <b id="em-sz2v"></b></span><input type="range" id="em-size2" min="15" max="100" value="${EM.size}"></label><div class="seg emseg2"><button class="btn" data-e="rop" data-v="dig">掘削</button><button class="btn" data-e="rop" data-v="fill">盛土</button><button class="btn" data-e="rop" data-v="flat">平坦化</button><button class="btn" data-e="rop" data-v="slope">斜面調整</button><button class="btn" data-e="rop" data-v="rock">岩場除去</button></div><label class="emr" id="em-vl-w"><span id="em-vl"></span><input type="range" id="em-val" min="1" max="200" value="20"></label><button class="btn" id="em-mean" data-e="rmean" style="display:none">選択範囲の平均標高を取得</button><label class="emr"><span>境界のなだらかさ <b id="em-fev"></b></span><input type="range" id="em-fe" min="1" max="12" value="${EM.rf}"></label></div><div class="emb"><button class="btn p" data-e="commit" id="em-c">工事開始</button><button class="btn" data-e="cancel" id="em-x">キャンセル</button><button class="btn" data-e="undo" id="em-u">取消</button><button class="btn" data-e="redo" id="em-r">やり直す</button><button class="btn" data-e="exit">編集終了</button></div><p class="emn">プレビューを確認して工事を開始します。費用は資金から引かれます。施工中の範囲は完了まで別の編集ができません。</p></div>`}
 function emRefresh(){const t=MV.t,q=s=>document.getElementById(s);if(!q('empanel'))return;
  document.querySelectorAll('#empanel [data-e=tool]').forEach(b=>b.classList.toggle('on',b.dataset.v===EM.tool));
- q('em-szv').textContent='半径 '+EM.size*10+' m';q('em-stv').textContent=EM.str;{const hh=q('em-h');if(hh)hh.textContent=({dig:'なぞった所を削ります',raise:'なぞった所を盛り上げます',smooth:'細かな凹凸をなだらかにします',flat:'最初にタッチした高さに揃えて平らにします',slope:'斜面の傾きを整え、急すぎる斜面を緩やかにします',rock:'岩場を除去し、周囲になじませます',view:'画面の移動(加工はしません)'})[EM.tool]||''}
+ q('em-szv').textContent='半径 '+EM.size*10+' m';q('em-stv').textContent=EM.str;{const hh=q('em-h');if(hh)hh.textContent=({dig:'なぞった所を削ります',raise:'なぞった所を盛り上げます',smooth:'細かな凹凸をなだらかにします',flat:'最初にタッチした高さに揃えて平らにします',slope:'斜面の傾きを整え、急すぎる斜面を緩やかにします',rock:'岩場オブジェクトを除去します(地形は変えません)',view:'画面の移動(加工はしません)'})[EM.tool]||''}
  const stat = emCalcCost(t, EM.pb);
- const costStr = stat.cost > 0 ? `<br><span style="color:var(--tx)">費用: ${yen(stat.cost)} / 期間: ${stat.days}日</span>` : "";
+ let costStr = "";
+ if(stat.cost > 0) {
+  costStr = `<br><span style="color:var(--tx)">費用: ${yen(stat.cost)} / 期間: ${stat.days}日</span>`;
+  costStr += `<br><span style="font-size:11px">面積: ${(stat.area/10000).toFixed(1)}ha`;
+  if (stat.digVol>0) costStr += ` / 掘削: ${Math.round(stat.digVol).toLocaleString()}m³`;
+  if (stat.fillVol>0) costStr += ` / 盛土: ${Math.round(stat.fillVol).toLocaleString()}m³`;
+  if (stat.rockArea>0) costStr += ` / 岩場: ${(stat.rockArea/10000).toFixed(1)}ha`;
+  costStr += `</span>`;
+ }
  q('em-st').innerHTML=stat.n?`対象 ${stat.n}点 最大 ${Math.round(stat.mx)}m${costStr}`:'';
  emRegionRefresh();
  const canAfford = stat.cost > 0 && G && G.funds >= stat.cost;
@@ -617,6 +633,7 @@ document.addEventListener('input',e=>{if(e.target.id==='em-size'){EM.size=+e.tar
 
 /* 区画指定 */
 function tRegionPreview(t,sel,op,v,F){const K=t.k,cs=t.cs;if(!t.pd)t.pd=new Float32Array(K*K);
+ if(op==='rock'&&!t.rd)t.rd=new Uint8Array(K*K);
  let i0=K,j0=K,i1=-1,j1=-1,n=0;
  for(let j=0;j<K;j++)for(let i=0;i<K;i++)if(sel[j*K+i]){n++;if(i<i0)i0=i;if(i>i1)i1=i;if(j<j0)j0=j;if(j>j1)j1=j}
  if(!n)return null;
@@ -629,8 +646,10 @@ function tRegionPreview(t,sel,op,v,F){const K=t.k,cs=t.cs;if(!t.pd)t.pd=new Floa
   let cxx=0,cxz=0,czz=0,cxh=0,czh=0;for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*K+i;if(!sel[k]||t.locks[k])continue;const dx=(i-mx)*cs*10,dz=(j-mz)*cs*10,dh=t.h0[k]+t.dl[k]-mh;cxx+=dx*dx;cxz+=dx*dz;czz+=dz*dz;cxh+=dx*dh;czh+=dz*dh}
   const det=cxx*czz-cxz*cxz;if(det>1e-6){gx=(cxh*czz-czh*cxz)/det;gz=(czh*cxx-cxh*cxz)/det}const tg=Math.tan(v*Math.PI/180),gm=Math.hypot(gx,gz);if(gm>tg){gx*=tg/gm;gz*=tg/gm}}
  for(let j=f0;j<=f1;j++)for(let i=e0;i<=e1;i++){const dist=D[(j-f0)*W+(i-e0)]/3,w=dist<=0?1:dist>=F?0:.5*(1+Math.cos(Math.PI*dist/F));if(!w)continue;
-  const k=j*K+i;if(t.locks[k])continue;const bk=t.h0[k]+t.dl[k];let dh;
-  if(op==='dig')dh=-v;else if(op==='fill')dh=v;else if(op==='flat')dh=v-bk;else if(op==='rock')dh=-0.1;else dh=mh+gx*(i-mx)*cs*10+gz*(j-mz)*cs*10-bk;
+  const k=j*K+i;if(t.locks[k])continue;
+  if(op==='rock'){if(w>0.1)t.rd[k]=1;continue;}
+  const bk=t.h0[k]+t.dl[k];let dh;
+  if(op==='dig')dh=-v;else if(op==='fill')dh=v;else if(op==='flat')dh=v-bk;else dh=mh+gx*(i-mx)*cs*10+gz*(j-mz)*cs*10-bk;
   let nv=dh*w;nv=Math.max(-ED_MAX-t.dl[k],Math.min(ED_MAX-t.dl[k],nv));nv=Math.max(ED_MIN_E-bk,Math.min(ED_MAX_E-bk,nv));t.pd[k]=nv;t.h[k]=bk+nv}
  return tRelax(t,e0,f0,e1,f1)}
 function emSelEnsure(t){if(!EM.sel||EM.sel.length!==t.k*t.k){EM.sel=new Uint8Array(t.k*t.k);EM.bd=new Uint8Array(t.k*t.k);EM.selN=0;EM.selBB=null}}
@@ -699,7 +718,9 @@ function buildPage() {
     html += '<div class="dg">';
     G.works.forEach(w => {
       const pct = Math.round((1 - w.daysLeft / w.daysTotal) * 100);
-      html += `<div class="card k"><b>${E(w.name)}</b><dl><dt>費用</dt><dd>${yen(w.cost)}</dd><dt>面積</dt><dd>${Math.round(w.area/100)/100} ha</dd><dt>進捗</dt><dd>${pct}% (残り ${w.daysLeft} 日)</dd></dl><button class="btn" style="margin-top:8px" onclick="cancelWork('${w.id}')">工事を取り消す</button></div>`;
+      let ds = `<dt>面積</dt><dd>${Math.round(w.area/100)/100} ha</dd>`;
+      if(w.rockArea) ds += `<dt>岩場</dt><dd>${Math.round(w.rockArea/100)/100} ha</dd>`;
+      html += `<div class="card k"><b>${E(w.name)}</b><dl><dt>費用</dt><dd>${yen(w.cost)}</dd>${ds}<dt>進捗</dt><dd>${pct}% (残り ${w.daysLeft} 日)</dd></dl><button class="btn" style="margin-top:8px" onclick="cancelWork('${w.id}')">工事を取り消す</button></div>`;
     });
     html += '</div>';
   }
@@ -708,7 +729,9 @@ function buildPage() {
   else {
     html += '<ul style="padding-left:20px; font-size:13px; color:var(--sub)">';
     [...G.history].reverse().slice(0, 20).forEach(w => {
-      html += `<li style="margin-bottom:6px"><b style="color:var(--tx)">${E(w.name)}</b> (${w.state} / ${fmtDate(w.startDate)} ～ ${w.endDate ? fmtDate(w.endDate) : ''})<br>面積: ${Math.round(w.area/100)/100} ha, 費用: ${yen(w.cost)}</li>`;
+      let ext = `面積: ${Math.round(w.area/100)/100} ha`;
+      if (w.rockArea) ext += `, 岩場除去: ${Math.round(w.rockArea/100)/100} ha`;
+      html += `<li style="margin-bottom:6px"><b style="color:var(--tx)">${E(w.name)}</b> (${w.state} / ${fmtDate(w.startDate)} ～ ${w.endDate ? fmtDate(w.endDate) : ''})<br>${ext}, 費用: ${yen(w.cost)}</li>`;
     });
     html += '</ul>';
   }
@@ -721,7 +744,10 @@ window.cancelWork = function(id) {
   if(!confirm(`「${w.name}」を中止しますか？\n進捗に応じた返金が行われます。`)) return;
   const refund = Math.floor(w.cost * (w.daysLeft / w.daysTotal) * 0.9); G.funds += refund;
   w.state = "取消"; w.endDate = G.date;
-  if(TC && w.patch) { for(let i=0; i<w.patch.idx.length; i++) TC.locks[w.patch.idx[i]] = 0; }
+  if(TC && w.patch) { 
+    if(w.patch.idx) for(let i=0; i<w.patch.idx.length; i++) TC.locks[w.patch.idx[i]] = 0; 
+    if(w.patch.ridx) for(let i=0; i<w.patch.ridx.length; i++) TC.locks[w.patch.ridx[i]] = 0; 
+  }
   G.history = G.history || []; G.history.push(w); G.works.splice(idx, 1);
   saveGame(true); upd(); toast(`工事を中止し、${yen(refund)}が返金されました`);
 }
@@ -735,7 +761,8 @@ DAILY.push(g => {
         g.history = g.history || []; g.history.push(w);
         if(TC && w.patch) {
           tApplyPatch(TC, w.patch, true);
-          for(let i=0; i<w.patch.idx.length; i++) TC.locks[w.patch.idx[i]] = 0;
+          if(w.patch.idx) for(let i=0; i<w.patch.idx.length; i++) TC.locks[w.patch.idx[i]] = 0;
+          if(w.patch.ridx) for(let i=0; i<w.patch.ridx.length; i++) TC.locks[w.patch.ridx[i]] = 0;
           emSave(TC); if(MV.t === TC) mvEditRefresh(TC, w.patch.bb, true);
         }
       }
