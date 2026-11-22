@@ -478,13 +478,15 @@ function tInitEdit(t,ed){
  t.deadTrees = new Uint8Array(t.k * t.k);
  if(G && G.map.deadRocks) G.map.deadRocks.forEach(k => t.deadRocks[k] = 1);
  if(G && G.map.deadTrees) G.map.deadTrees.forEach(k => t.deadTrees[k] = 1);
- if(G && G.works) G.works.forEach(w => {
-  if (w.state === "施工中" && w.patch) {
-   if (w.patch.idx) for (let i = 0; i < w.patch.idx.length; i++) t.locks[w.patch.idx[i]] = 1;
-   if (w.patch.ridx) for (let i = 0; i < w.patch.ridx.length; i++) t.locks[w.patch.ridx[i]] = 1;
-   if (w.patch.tidx) for (let i = 0; i < w.patch.tidx.length; i++) t.locks[w.patch.tidx[i]] = 1;
-  }
- });
+ if(G && G.works) {
+  const activeWorks = G.works.filter(w => w.state === "施工中" && w.patch);
+  activeWorks.forEach(w => {
+   tApplyPatch(t, w.patch, true);
+   w.state = "完了"; w.endDate = G.date;
+   G.history = G.history || []; G.history.push(w);
+  });
+  G.works = []; if(activeWorks.length > 0) emSave(t);
+ }
  if(ed){const d=edDec(ed,t.k*t.k);if(d){for(let k=0;k<d.length;k++){const e=Math.max(ED_MIN_E,Math.min(ED_MAX_E,t.h0[k]+d[k]));t.dl[k]=e-t.h0[k];t.h[k]=e}tReclass(t,0,0,t.k-1,t.k-1);tStats(t)}else{t.ed='';toast('地形の編集データを読み込めなかったため、元の地形を表示します')}}}
 function tReclass(t,i0,j0,i1,j1){const N=t.n,K=t.k,E=t.h,HM=t.cs*10,ce=t.cellElev,sl=t.cellSlope,ty=t.cellType,dv=t.cellDev,md=t.cellMod,base=t.base,rel=t.rel,cl=t.cls;
  const ci0=Math.max(0,i0-1),cj0=Math.max(0,j0-1),ci1=Math.min(N-1,i1),cj1=Math.min(N-1,j1);
@@ -579,10 +581,27 @@ function emGfx(){if(EM.cols)return;EM.cols=[new THREE.Color(0xff6a3d),new THREE.
 function mvRay(cx,cy){const r=MV.cv.getBoundingClientRect(),nx=(cx-r.left)/r.width*2-1,ny=-((cy-r.top)/r.height*2-1);mvCam();MV.cam.updateMatrixWorld();const o=MV.cam.position,v=new THREE.Vector3(nx,ny,.5).unproject(MV.cam).sub(o).normalize();return{o:{x:o.x,y:o.y,z:o.z},v:{x:v.x,y:v.y,z:v.z}}}
 function mvPick(cx,cy){const t=MV.t;if(!t||!MV.cv)return null;const q=mvRay(cx,cy);return tRay(t,q.o,q.v,MV.d*2.5+2000,Math.max(2,MV.d*.004))}
 function mvInstances(t,b){const d=new THREE.Object3D(),S=t.size,cs=t.cs,K=t.k,bb=b?[-S/2+b[0]*cs-cs,-S/2+b[1]*cs-cs,-S/2+b[2]*cs+cs,-S/2+b[3]*cs+cs]:null;
- const deadR=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3 || (t.deadRocks && t.deadRocks[k]) || (t.rd && t.rd[k]);};
- const deadT=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3 || (t.deadTrees && t.deadTrees[k]) || (t.td && t.td[k]);};
- const run=(im,arr,rk,df)=>{if(!im)return;for(let n=0;n<arr.length;n++){const q=arr[n];if(bb&&(q.x<bb[0]||q.x>bb[2]||q.z<bb[1]||q.z>bb[3]))continue;d.position.set(q.x,yOf(t,tSample(t,q.x,q.z))+(rk?q.s*.3:0),q.z);const s=df(q)?0:q.s;d.scale.set(s,s*(rk?.7:1),s);d.updateMatrix();im.setMatrixAt(n,d.matrix)}im.instanceMatrix.needsUpdate=true};
- run(MV.imT,t.trees,0,deadT);run(MV.imR,t.rocks,1,deadR)}
+ const deadR=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3 || (t.deadRocks && t.deadRocks[k]);};
+ const deadT=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3 || (t.deadTrees && t.deadTrees[k]);};
+ const cNorm = new THREE.Color(1,1,1), cPrev = new THREE.Color(4, 0.8, 0.8);
+ const run=(im,arr,rk,df,rd_td)=>{if(!im)return;
+  let updColor = false;
+  if(!im.instanceColor){
+   im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(arr.length*3),3);
+   for(let n=0;n<arr.length;n++)im.setColorAt(n,cNorm);
+   updColor = true;
+  }
+  for(let n=0;n<arr.length;n++){const q=arr[n];if(bb&&(q.x<bb[0]||q.x>bb[2]||q.z<bb[1]||q.z>bb[3]))continue;
+   d.position.set(q.x,yOf(t,tSample(t,q.x,q.z))+(rk?q.s*.3:0),q.z);const s=df(q)?0:q.s;d.scale.set(s,s*(rk?.7:1),s);d.updateMatrix();im.setMatrixAt(n,d.matrix);
+   const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;
+   const p=(rd_td&&rd_td[k]);
+   im.setColorAt(n,p?cPrev:cNorm);
+   updColor = true;
+  }
+  im.instanceMatrix.needsUpdate=true;
+  if(updColor)im.instanceColor.needsUpdate=true;
+ };
+ run(MV.imT,t.trees,0,deadT,t.td);run(MV.imR,t.rocks,1,deadR,t.rd);}
 function mvEditRefresh(t,b,commit){if(!MV.geo||MV.t!==t||!b)return;const K=t.k,p=MV.geo.attributes.position;for(let j=b[1];j<=b[3];j++)for(let i=b[0];i<=b[2];i++)p.setY(j*K+i,yOf(t,t.h[j*K+i]));p.needsUpdate=true;
  const m=commit?3:1;mvColor(G&&G.wx?G.wx.depth:0,[Math.max(0,b[0]-m),Math.max(0,b[1]-m),Math.min(K-1,b[2]+m),Math.min(K-1,b[3]+m)]);mvInstances(t,b);if(commit)MV.geo.computeBoundingSphere();mvDraw()}
 function emRingUpdate(p){const g=EM.ring;if(!g)return;const tl=EM.mode==='region'?(EM.rtool==='paint'?'sel':'view'):EM.tool;if(!p||!EM.on||tl==='view'){g.visible=false;mvDraw();return}const t=MV.t,a=g.geometry.attributes.position;for(let n=0;n<=48;n++){const q=n/48*Math.PI*2,x=p.x+Math.cos(q)*EM.size,z=p.z+Math.sin(q)*EM.size;a.setXYZ(n,x,yOf(t,tSample(t,x,z))+2,z)}a.needsUpdate=true;g.material.color.setHex(EM.rc[tl]||0xffffff);g.visible=true;mvDraw()}
@@ -678,7 +697,7 @@ function emCancel(){EM.pvOn=false;const t=MV.t;if(!t||!EM.pb)return;const bb=EM.
 // 工事費用計算
 function emCalcCost(t, bb) {
  let n = 0, mx = 0, digVol = 0, fillVol = 0, area = 0, rockArea = 0, treeArea = 0;
- if (!bb || !t || (!t.pd && !t.rd && !t.td)) return {n:0, cost:0, days:0};
+ if (!bb || !t || (!t.pd && !t.rd && !t.td)) return {n:0, cost:0};
  const K = t.k, csArea = (t.cs * 10) * (t.cs * 10);
  for(let j=bb[1]; j<=bb[3]; j++) for(let i=bb[0]; i<=bb[2]; i++){
   const k = j*K+i;
@@ -699,11 +718,10 @@ function emCalcCost(t, bb) {
    treeArea += csArea;
   }
  }
- if (n === 0) return {n:0, cost:0, days:0};
+ if (n === 0) return {n:0, cost:0};
  const U_DIG = 20, U_FILL = 30, U_AREA = 15, U_ROCK = 30, U_TREE = 15;
  const cost = Math.floor(digVol * U_DIG + fillVol * U_FILL + area * U_AREA + rockArea * U_ROCK + treeArea * U_TREE);
- const days = Math.max(1, Math.ceil(area / 20000 + Math.abs(digVol + fillVol) / 50000 + (rockArea + treeArea) / 15000));
- return {n, mx, area, digVol, fillVol, rockArea, treeArea, cost, days};
+ return {n, mx, area, digVol, fillVol, rockArea, treeArea, cost};
 }
 
 function emCommit(){
@@ -716,25 +734,22 @@ function emCommit(){
  if(!pt){ mvEditRefresh(t,bb,false);emRefresh();return; }
  
  G.funds -= stat.cost;
- G.works = G.works || [];
- G.works.push({
+ tApplyPatch(t, pt, true);
+ G.history = G.history || [];
+ G.history.push({
   id: "W_" + Date.now(),
   name: EM.mode === 'region' ? (EM.op==='clear'?"障害物除去(区画)":"造成工事(区画)") : (EM.tool==='clear'?"障害物除去(ブラシ)":"造成工事(ブラシ)"),
   area: stat.area, vol: stat.digVol + stat.fillVol, rockArea: stat.rockArea, treeArea: stat.treeArea,
-  cost: stat.cost, daysTotal: stat.days, daysLeft: stat.days,
-  startDate: G.date, state: "施工中", patch: pt
+  cost: stat.cost, startDate: G.date, endDate: G.date, state: "完了"
  });
  
- if(pt.idx) for(let i=0; i<pt.idx.length; i++) t.locks[pt.idx[i]] = 1;
- if(pt.ridx) for(let i=0; i<pt.ridx.length; i++) t.locks[pt.ridx[i]] = 1;
- if(pt.tidx) for(let i=0; i<pt.tidx.length; i++) t.locks[pt.tidx[i]] = 1;
  emSave(t); saveGame(true);
  EM.stack=[]; EM.redo=[];
- mvEditRefresh(t, bb, false); emRefresh(); upd();
- toast("地形造成工事を開始しました");
+ mvEditRefresh(t, bb, true); emRefresh(); upd();
+ toast("地形造成工事が完了しました");
 }
 function emTool(v){EM.tool=v;if(EM.stroking){EM.stroking=false;EM.last=null}if(MV.cv)MV.cv.style.cursor=v==='view'?'grab':'crosshair';emRingUpdate(v==='view'?null:EM.pick);emRefresh()}
-function emPanel(){return `<div class="empanel" id="empanel"><div class="emh"><b>地形造成</b><span id="em-st" class="note"></span></div><div class="seg emmode"><button class="btn" data-e="mode" data-v="brush">自由ブラシ</button><button class="btn" data-e="mode" data-v="region">区画指定</button></div><div id="em-clear-opt" style="display:none; flex-direction:column; gap:4px; padding-bottom:6px; border-bottom:1px solid var(--bd)"><span class="emn">除去対象</span><div class="seg"><button class="btn" data-e="copt" data-v="rock">岩場</button><button class="btn" data-e="copt" data-v="tree">樹木</button><button class="btn" data-e="copt" data-v="both">両方</button></div></div><div id="em-brush"><div class="seg emseg"><button class="btn" data-e="tool" data-v="dig">掘削</button><button class="btn" data-e="tool" data-v="raise">隆起</button><button class="btn" data-e="tool" data-v="smooth">平滑化</button><button class="btn" data-e="tool" data-v="flat">平坦化</button><button class="btn" data-e="tool" data-v="slope">斜面調整</button><button class="btn" data-e="tool" data-v="clear">障害物除去</button><button class="btn" data-e="tool" data-v="view">視点移動</button></div><p class="emn" id="em-h"></p><label class="emr"><span>ブラシサイズ <b id="em-szv"></b></span><input type="range" id="em-size" min="15" max="100" value="${EM.size}"></label><label class="emr"><span>加工強度 <b id="em-stv"></b></span><input type="range" id="em-str" min="1" max="10" value="${EM.str}"></label></div><div id="em-region" style="display:none"><div class="seg emseg2"><button class="btn" data-e="rtool" data-v="rect">矩形</button><button class="btn" data-e="rtool" data-v="paint">なぞり</button><button class="btn" data-e="rtool" data-v="view">視点移動</button></div><div class="seg emseg2"><button class="btn" id="em-add" data-e="radd">追加</button><button class="btn" id="em-sub" data-e="rsub">解除</button><button class="btn" data-e="rclear">選択クリア</button></div><p class="emn" id="em-sel"></p><label class="emr" id="em-sz2"><span>なぞりのサイズ <b id="em-sz2v"></b></span><input type="range" id="em-size2" min="15" max="100" value="${EM.size}"></label><div class="seg emseg2"><button class="btn" data-e="rop" data-v="dig">掘削</button><button class="btn" data-e="rop" data-v="fill">盛土</button><button class="btn" data-e="rop" data-v="flat">平坦化</button><button class="btn" data-e="rop" data-v="slope">斜面調整</button><button class="btn" data-e="rop" data-v="clear">障害物除去</button></div><label class="emr" id="em-vl-w"><span id="em-vl"></span><input type="range" id="em-val" min="1" max="200" value="20"></label><button class="btn" id="em-mean" data-e="rmean" style="display:none">選択範囲の平均標高を取得</button><label class="emr"><span>境界のなだらかさ <b id="em-fev"></b></span><input type="range" id="em-fe" min="1" max="12" value="${EM.rf}"></label></div><div class="emb"><button class="btn p" data-e="commit" id="em-c">工事開始</button><button class="btn" data-e="cancel" id="em-x">キャンセル</button><button class="btn" data-e="undo" id="em-u">取消</button><button class="btn" data-e="redo" id="em-r">やり直す</button><button class="btn" data-e="exit">編集終了</button></div><p class="emn">プレビューを確認して工事を開始します。費用は資金から引かれます。施工中の範囲は完了まで別の編集ができません。</p></div>`}
+function emPanel(){return `<div class="empanel" id="empanel"><div class="emh"><b>地形造成</b><span id="em-st" class="note"></span></div><div class="seg emmode"><button class="btn" data-e="mode" data-v="brush">自由ブラシ</button><button class="btn" data-e="mode" data-v="region">区画指定</button></div><div id="em-clear-opt" style="display:none; flex-direction:column; gap:4px; padding-bottom:6px; border-bottom:1px solid var(--bd)"><span class="emn">除去対象</span><div class="seg"><button class="btn" data-e="copt" data-v="rock">岩場</button><button class="btn" data-e="copt" data-v="tree">樹木</button><button class="btn" data-e="copt" data-v="both">両方</button></div></div><div id="em-brush"><div class="seg emseg"><button class="btn" data-e="tool" data-v="dig">掘削</button><button class="btn" data-e="tool" data-v="raise">隆起</button><button class="btn" data-e="tool" data-v="smooth">平滑化</button><button class="btn" data-e="tool" data-v="flat">平坦化</button><button class="btn" data-e="tool" data-v="slope">斜面調整</button><button class="btn" data-e="tool" data-v="clear">障害物除去</button><button class="btn" data-e="tool" data-v="view">視点移動</button></div><p class="emn" id="em-h"></p><label class="emr"><span>ブラシサイズ <b id="em-szv"></b></span><input type="range" id="em-size" min="15" max="100" value="${EM.size}"></label><label class="emr"><span>加工強度 <b id="em-stv"></b></span><input type="range" id="em-str" min="1" max="10" value="${EM.str}"></label></div><div id="em-region" style="display:none"><div class="seg emseg2"><button class="btn" data-e="rtool" data-v="rect">矩形</button><button class="btn" data-e="rtool" data-v="paint">なぞり</button><button class="btn" data-e="rtool" data-v="view">視点移動</button></div><div class="seg emseg2"><button class="btn" id="em-add" data-e="radd">追加</button><button class="btn" id="em-sub" data-e="rsub">解除</button><button class="btn" data-e="rclear">選択クリア</button></div><p class="emn" id="em-sel"></p><label class="emr" id="em-sz2"><span>なぞりのサイズ <b id="em-sz2v"></b></span><input type="range" id="em-size2" min="15" max="100" value="${EM.size}"></label><div class="seg emseg2"><button class="btn" data-e="rop" data-v="dig">掘削</button><button class="btn" data-e="rop" data-v="fill">盛土</button><button class="btn" data-e="rop" data-v="flat">平坦化</button><button class="btn" data-e="rop" data-v="slope">斜面調整</button><button class="btn" data-e="rop" data-v="clear">障害物除去</button></div><label class="emr" id="em-vl-w"><span id="em-vl"></span><input type="range" id="em-val" min="1" max="200" value="20"></label><button class="btn" id="em-mean" data-e="rmean" style="display:none">選択範囲の平均標高を取得</button><label class="emr"><span>境界のなだらかさ <b id="em-fev"></b></span><input type="range" id="em-fe" min="1" max="12" value="${EM.rf}"></label></div><div class="emb"><button class="btn p" data-e="commit" id="em-c">工事実行</button><button class="btn" data-e="cancel" id="em-x">キャンセル</button><button class="btn" data-e="undo" id="em-u">取消</button><button class="btn" data-e="redo" id="em-r">やり直す</button><button class="btn" data-e="exit">編集終了</button></div><p class="emn">プレビューを確認して工事を実行します。費用は資金から引かれ、即座に完了します。</p></div>`}
 function emRefresh(){const t=MV.t,q=s=>document.getElementById(s);if(!q('empanel'))return;
  document.querySelectorAll('#empanel [data-e=tool]').forEach(b=>b.classList.toggle('on',b.dataset.v===EM.tool));
  q('em-szv').textContent='半径 '+EM.size*10+' m';q('em-stv').textContent=EM.str;{const hh=q('em-h');if(hh)hh.textContent=({dig:'なぞった所を削ります',raise:'なぞった所を盛り上げます',smooth:'細かな凹凸をなだらかにします',flat:'最初にタッチした高さに揃えて平らにします',slope:'斜面の傾きを整え、急すぎる斜面を緩やかにします',clear:'岩場・樹木オブジェクトを除去します(地形は変えません)',view:'画面の移動(加工はしません)'})[EM.tool]||''}
@@ -745,7 +760,7 @@ function emRefresh(){const t=MV.t,q=s=>document.getElementById(s);if(!q('empanel
  const stat = emCalcCost(t, EM.pb);
  let costStr = "";
  if(stat.cost > 0) {
-  costStr = `<br><span style="color:var(--tx)">費用: ${yen(stat.cost)} / 期間: ${stat.days}日</span>`;
+  costStr = `<br><span style="color:var(--tx)">費用: ${yen(stat.cost)}</span>`;
   costStr += `<br><span style="font-size:11px">面積: ${(stat.area/10000).toFixed(1)}ha`;
   if (stat.digVol>0) costStr += ` / 掘削: ${Math.round(stat.digVol).toLocaleString()}m³`;
   if (stat.fillVol>0) costStr += ` / 盛土: ${Math.round(stat.fillVol).toLocaleString()}m³`;
@@ -877,69 +892,22 @@ function emRegionRefresh(){const q=s=>document.getElementById(s),R=EM.mode==='re
 
 /* ---- 工事管理画面 ---- */
 function buildPage() {
-  let html = '<h2>CONSTRUCTION</h2><p>地形の造成工事を管理します。MOUNTAIN MAPの「地形造成工事」から開始してください。</p>';
-  html += '<div class="card"><h3>施工中の工事</h3>';
-  if(!G.works || G.works.length === 0) html += '<p class="note">現在施工中の工事はありません。</p>';
-  else {
-    html += '<div class="dg">';
-    G.works.forEach(w => {
-      const pct = Math.round((1 - w.daysLeft / w.daysTotal) * 100);
-      let ds = `<dt>面積</dt><dd>${Math.round(w.area/100)/100} ha</dd>`;
-      if(w.rockArea) ds += `<dt>岩場</dt><dd>${Math.round(w.rockArea/100)/100} ha</dd>`;
-      if(w.treeArea) ds += `<dt>樹木</dt><dd>${Math.round(w.treeArea/100)/100} ha</dd>`;
-      html += `<div class="card k"><b>${E(w.name)}</b><dl><dt>費用</dt><dd>${yen(w.cost)}</dd>${ds}<dt>進捗</dt><dd>${pct}% (残り ${w.daysLeft} 日)</dd></dl><button class="btn" style="margin-top:8px" onclick="cancelWork('${w.id}')">工事を取り消す</button></div>`;
-    });
-    html += '</div>';
-  }
-  html += '</div><div class="card"><h3>工事履歴</h3>';
+  let html = '<h2>CONSTRUCTION</h2><p>地形の造成工事の履歴を確認できます。MOUNTAIN MAPの「地形造成工事」から工事を実行してください。</p>';
+  html += '<div class="card"><h3>工事履歴</h3>';
   if(!G.history || G.history.length === 0) html += '<p class="note">工事履歴はありません。</p>';
   else {
     html += '<ul style="padding-left:20px; font-size:13px; color:var(--sub)">';
-    [...G.history].reverse().slice(0, 20).forEach(w => {
+    [...G.history].reverse().slice(0, 30).forEach(w => {
       let ext = `面積: ${Math.round(w.area/100)/100} ha`;
       if (w.rockArea) ext += `, 岩場除去: ${Math.round(w.rockArea/100)/100} ha`;
       if (w.treeArea) ext += `, 樹木除去: ${Math.round(w.treeArea/100)/100} ha`;
-      html += `<li style="margin-bottom:6px"><b style="color:var(--tx)">${E(w.name)}</b> (${w.state} / ${fmtDate(w.startDate)} ～ ${w.endDate ? fmtDate(w.endDate) : ''})<br>${ext}, 費用: ${yen(w.cost)}</li>`;
+      html += `<li style="margin-bottom:6px"><b style="color:var(--tx)">${E(w.name)}</b> (${fmtDate(w.endDate || w.startDate)})<br>${ext}, 費用: ${yen(w.cost)}</li>`;
     });
     html += '</ul>';
   }
   html += '</div>';
   return html;
 }
-window.cancelWork = function(id) {
-  if(!G.works) return; const idx = G.works.findIndex(w => w.id === id); if(idx < 0) return;
-  const w = G.works[idx];
-  if(!confirm(`「${w.name}」を中止しますか？\n進捗に応じた返金が行われます。`)) return;
-  const refund = Math.floor(w.cost * (w.daysLeft / w.daysTotal) * 0.9); G.funds += refund;
-  w.state = "取消"; w.endDate = G.date;
-  if(TC && w.patch) { 
-    if(w.patch.idx) for(let i=0; i<w.patch.idx.length; i++) TC.locks[w.patch.idx[i]] = 0; 
-    if(w.patch.ridx) for(let i=0; i<w.patch.ridx.length; i++) TC.locks[w.patch.ridx[i]] = 0; 
-    if(w.patch.tidx) for(let i=0; i<w.patch.tidx.length; i++) TC.locks[w.patch.tidx[i]] = 0; 
-  }
-  G.history = G.history || []; G.history.push(w); G.works.splice(idx, 1);
-  saveGame(true); upd(); toast(`工事を中止し、${yen(refund)}が返金されました`);
-}
-DAILY.push(g => {
-  if(!g.works) return;
-  g.works.forEach(w => {
-    if(w.state === "施工中") {
-      w.daysLeft--;
-      if(w.daysLeft <= 0) {
-        w.state = "完了"; w.endDate = g.date;
-        g.history = g.history || []; g.history.push(w);
-        if(TC && w.patch) {
-          tApplyPatch(TC, w.patch, true);
-          if(w.patch.idx) for(let i=0; i<w.patch.idx.length; i++) TC.locks[w.patch.idx[i]] = 0;
-          if(w.patch.ridx) for(let i=0; i<w.patch.ridx.length; i++) TC.locks[w.patch.ridx[i]] = 0;
-          if(w.patch.tidx) for(let i=0; i<w.patch.tidx.length; i++) TC.locks[w.patch.tidx[i]] = 0;
-          emSave(TC); if(MV.t === TC) mvEditRefresh(TC, w.patch.bb, true);
-        }
-      }
-    }
-  });
-  g.works = g.works.filter(w => w.state === "施工中");
-});
 
 /* ---- game screen ---- */
 function enterGame(){show("game");view="dash";$("#hn").textContent=G.name;$("#nav").innerHTML=[NAV[1],NAV[0]].concat(NAV.slice(2)).map(n=>'<button class="ni" data-a="nav" data-v="'+n[0]+'"><span>'+n[2]+"</span></button>").join("")+'<div class="ns"><button class="ni" data-a="save"><span>SAVE</span></button><button class="ni" data-a="title"><span>TITLE</span></button></div>';upd()}
