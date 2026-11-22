@@ -417,20 +417,50 @@ function mvDraw(){if(MV.q||!MV.ok||!MV.box||!MV.box.isConnected||MV.box.offsetPa
 function mvZoom(f){MV.d=Math.max(55,Math.min(2800,MV.d*f));mvDraw()}
 function mvPan(dx,dy){const k=MV.d*.73/Math.max(300,MV.cv.clientHeight),s=Math.sin(MV.yaw),c=Math.cos(MV.yaw),lim=(MV.t?MV.t.size:240)*.45;MV.tx=Math.max(-lim,Math.min(lim,MV.tx-c*dx*k-s*dy*k*1.26));MV.tz=Math.max(-lim,Math.min(lim,MV.tz+s*dx*k-c*dy*k*1.26));mvDraw()}
 function mvFit(){const a=MV.cam?MV.cam.aspect:1.5,T=MV.t,hr=T?(T.emax-T.base)*YS/T.size:.19,z=(T?T.size:640)/640*900*(1+1.2*hr)/1.23;MV.d=Math.min(2800,z*Math.max(1,1.3/a))}
-function mvReset(){MV.tx=0;MV.tz=0;mvFit();mvDraw()}
+function mvReset(){MV.tx=0;MV.tz=0;MV.yaw=0.6;MV.pitch=0.9;mvFit();mvDraw()}
 function mvResize(){const b=MV.box;if(!b||!MV.r)return;const w=b.clientWidth,h=b.clientHeight;if(!w||!h)return;MV.r.setPixelRatio(Math.min(window.devicePixelRatio||1,2));MV.r.setSize(w,h,false);MV.cam.aspect=w/h;MV.cam.updateProjectionMatrix();mvDraw()}
 function mvTheme(){if(!MV.r)return;const c=document.documentElement.dataset.theme==='dark'?0x14283a:0xd6e9f4;MV.r.setClearColor(c);MV.sc.fog.color.setHex(c);mvDraw()}
 function mvBind(cv){
- const P=new Map();let pd=0;
+ const P=new Map();let pd=0;let pc=null;
  const pdist=()=>{const a=[...P.values()];return a.length<2?0:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])};
+ const pcenter=()=>{const a=[...P.values()];return a.length<2?null:[(a[0][0]+a[1][0])/2,(a[0][1]+a[1][1])/2]};
  cv.style.touchAction='none';
- cv.addEventListener('pointerdown',e=>{try{cv.setPointerCapture(e.pointerId)}catch(_){}P.set(e.pointerId,[e.clientX,e.clientY]);pd=pdist();cv.style.cursor=EM.on?'crosshair':'grabbing';emDown(e,P)});
- cv.addEventListener('pointermove',e=>{const o=P.get(e.pointerId);if(!o){emHover(e);return}const dx=e.clientX-o[0],dy=e.clientY-o[1];P.set(e.pointerId,[e.clientX,e.clientY]);if(emMove(e,P,dx,dy))return;if(P.size===1)mvPan(dx,dy);else if(P.size===2){const n=pdist();if(pd>0&&n>0)mvZoom(pd/n);pd=n;if(EM.on)mvPan(dx/2,dy/2)}});
- const up=e=>{emUp(e,P);P.delete(e.pointerId);pd=pdist();if(!P.size)cv.style.cursor=EM.on?'crosshair':'grab'};
+ cv.addEventListener('contextmenu',e=>e.preventDefault());
+ cv.addEventListener('pointerdown',e=>{
+  try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  P.set(e.pointerId,[e.clientX,e.clientY]);
+  pd=pdist();pc=pcenter();
+  const tv=EM.mode==='region'?EM.rtool:EM.tool;
+  cv.style.cursor=EM.on&&tv!=='view'?'crosshair':'grabbing';
+  emDown(e,P);
+ });
+ cv.addEventListener('pointermove',e=>{
+  const o=P.get(e.pointerId);if(!o){emHover(e);return}
+  const dx=e.clientX-o[0],dy=e.clientY-o[1];
+  P.set(e.pointerId,[e.clientX,e.clientY]);
+  if(emMove(e,P,dx,dy)){pd=pdist();pc=pcenter();return;}
+  if(P.size===1){
+   if(e.pointerType==='mouse'&&e.buttons===2){mvPan(dx,dy);}
+   else if(e.pointerType==='mouse'&&e.buttons===1){MV.yaw-=dx*0.006;MV.pitch=Math.max(0.05,Math.min(1.5,MV.pitch+dy*0.006));mvDraw();}
+   else if(e.pointerType!=='mouse'){mvPan(dx,dy);}
+  }else if(P.size===2){
+   const n=pdist();if(pd>0&&n>0)mvZoom(pd/n);pd=n;
+   const nc=pcenter();
+   if(pc&&nc){MV.yaw-=(nc[0]-pc[0])*0.006;MV.pitch=Math.max(0.05,Math.min(1.5,MV.pitch+(nc[1]-pc[1])*0.006));mvDraw();}
+   pc=nc;
+  }
+ });
+ const up=e=>{
+  emUp(e,P);
+  P.delete(e.pointerId);
+  pd=pdist();pc=pcenter();
+  if(!P.size){const tv=EM.mode==='region'?EM.rtool:EM.tool;cv.style.cursor=EM.on&&tv!=='view'?'crosshair':'grab';}
+ };
  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
  cv.addEventListener('wheel',e=>{e.preventDefault();mvZoom(Math.exp((e.deltaMode===1?e.deltaY*33:e.deltaY)*.0012))},{passive:false});
  cv.addEventListener('webglcontextlost',e=>e.preventDefault());
- cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}})}
+ cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}});
+}
 function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button><button class="btn p" data-m="edit">地形造成工事</button></span></div>`}
 function layoutVars(){const h=$('.hd'),n=$('#nav'),s=document.documentElement.style;s.setProperty('--hh',(h?h.offsetHeight:64)+'px');s.setProperty('--nh',n&&getComputedStyle(n).position==='fixed'?n.offsetHeight+'px':'0px')}
 function mapPage(){return '<div class="map m3 big" id="mapbox"></div>'}
@@ -553,14 +583,14 @@ function mvInstances(t,b){const d=new THREE.Object3D(),S=t.size,cs=t.cs,K=t.k,bb
  const deadT=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3 || (t.deadTrees && t.deadTrees[k]) || (t.td && t.td[k]);};
  const run=(im,arr,rk,df)=>{if(!im)return;for(let n=0;n<arr.length;n++){const q=arr[n];if(bb&&(q.x<bb[0]||q.x>bb[2]||q.z<bb[1]||q.z>bb[3]))continue;d.position.set(q.x,yOf(t,tSample(t,q.x,q.z))+(rk?q.s*.3:0),q.z);const s=df(q)?0:q.s;d.scale.set(s,s*(rk?.7:1),s);d.updateMatrix();im.setMatrixAt(n,d.matrix)}im.instanceMatrix.needsUpdate=true};
  run(MV.imT,t.trees,0,deadT);run(MV.imR,t.rocks,1,deadR)}
-function mvEditRefresh(t,b,commit){if(!MV.geo||MV.t!==t)return;const K=t.k,p=MV.geo.attributes.position;for(let j=b[1];j<=b[3];j++)for(let i=b[0];i<=b[2];i++)p.setY(j*K+i,yOf(t,t.h[j*K+i]));p.needsUpdate=true;
+function mvEditRefresh(t,b,commit){if(!MV.geo||MV.t!==t||!b)return;const K=t.k,p=MV.geo.attributes.position;for(let j=b[1];j<=b[3];j++)for(let i=b[0];i<=b[2];i++)p.setY(j*K+i,yOf(t,t.h[j*K+i]));p.needsUpdate=true;
  const m=commit?3:1;mvColor(G&&G.wx?G.wx.depth:0,[Math.max(0,b[0]-m),Math.max(0,b[1]-m),Math.min(K-1,b[2]+m),Math.min(K-1,b[3]+m)]);mvInstances(t,b);if(commit)MV.geo.computeBoundingSphere();mvDraw()}
 function emRingUpdate(p){const g=EM.ring;if(!g)return;const tl=EM.mode==='region'?(EM.rtool==='paint'?'sel':'view'):EM.tool;if(!p||!EM.on||tl==='view'){g.visible=false;mvDraw();return}const t=MV.t,a=g.geometry.attributes.position;for(let n=0;n<=48;n++){const q=n/48*Math.PI*2,x=p.x+Math.cos(q)*EM.size,z=p.z+Math.sin(q)*EM.size;a.setXYZ(n,x,yOf(t,tSample(t,x,z))+2,z)}a.needsUpdate=true;g.material.color.setHex(EM.rc[tl]||0xffffff);g.visible=true;mvDraw()}
-function emUnion(a,b){return a?[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])]:b}
+function emUnion(a,b){return a?(b?[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])]:a):b}
 function emStampAt(p){const t=MV.t,R=EM.size,amt=(EM.tool==='dig'?-1:1)*EM.str*.8,sp=Math.max(t.cs*.8,R*.3);let pts=[];
  if(!EM.last)pts=[p];else{const dx=p.x-EM.last.x,dz=p.z-EM.last.z,L=Math.hypot(dx,dz);if(L<sp)return;const n=Math.min(12,Math.floor(L/sp));for(let i=1;i<=n;i++)pts.push({x:EM.last.x+dx*i*sp/L,z:EM.last.z+dz*i*sp/L})}
  let bb=null;for(const q of pts){bb=emUnion(bb,emApply(t,q.x,q.z,R,amt));EM.last=q}
- EM.pb=emUnion(EM.pb,bb);mvEditRefresh(t,bb,false);emRefresh()}
+ if(bb){EM.pb=emUnion(EM.pb,bb);mvEditRefresh(t,bb,false);}emRefresh()}
 
 /* Undo/Redo スナップショット管理 */
 function emSaveSnapshot() {
