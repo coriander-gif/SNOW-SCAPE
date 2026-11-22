@@ -575,6 +575,7 @@ function emSaveSnapshot() {
     selN: EM.selN,
     selBB: EM.selBB ? [...EM.selBB] : null,
     op: EM.op,
+    copt: EM.copt,
     rvs: {...EM.rvs}
   };
 }
@@ -601,6 +602,7 @@ function emRestoreSnapshot(t, snap) {
   EM.selN = snap.selN || 0;
   EM.selBB = snap.selBB ? [...snap.selBB] : null;
   EM.op = snap.op;
+  if (snap.copt) EM.copt = snap.copt;
   if (snap.rvs) EM.rvs = {...snap.rvs};
   
   if (t.pd) {
@@ -798,7 +800,29 @@ function emRegionClick(a,b){const t=MV.t;if(!t)return;const v=b.dataset.v;
  else if(a==='rtool'){EM.rtool=v;EM.drag=null;EM.stroking=false;if(MV.cv)MV.cv.style.cursor=v==='view'?'grab':'crosshair';emRingUpdate(null);emRefresh()}
  else if(a==='radd'){pushSnapshot();EM.rsub=false;emRefresh()}
  else if(a==='rsub'){pushSnapshot();EM.rsub=true;emRefresh()}
- else if(a==='copt'){pushSnapshot();EM.copt=v;if(EM.pvOn)emRPreview();emRefresh()}
+ else if(a==='copt'){
+  pushSnapshot();
+  EM.copt=v;
+  if (EM.mode==='region') {
+   if(EM.pvOn)emRPreview();
+  } else if (EM.mode==='brush' && EM.tool==='clear' && EM.pb) {
+   const K=t.k;
+   for (let j=EM.pb[1]; j<=EM.pb[3]; j++) {
+    for (let i=EM.pb[0]; i<=EM.pb[2]; i++) {
+     const k=j*K+i;
+     if ((t.rd && t.rd[k]) || (t.td && t.td[k])) {
+      if(t.rd) t.rd[k]=0;
+      if(t.td) t.td[k]=0;
+      if((EM.copt==='rock'||EM.copt==='both')&&(!t.deadRocks||!t.deadRocks[k])) t.rd[k]=1;
+      if((EM.copt==='tree'||EM.copt==='both')&&(!t.deadTrees||!t.deadTrees[k])) t.td[k]=1;
+     }
+    }
+   }
+   mvEditRefresh(t,EM.pb,false);
+  }
+  if(EM.pick) emRingUpdate(EM.pick);
+  emRefresh();
+ }
  else if(a==='rclear'){emSelEnsure(t);pushSnapshot();const bb=EM.selBB;EM.sel.fill(0);emSelBorder(t);EM.pvOn=false;emRPreview();emColorBB(bb);emRefresh()}
  else if(a==='rop'){pushSnapshot();EM.op=v;if(v==='flat'&&EM.flatAuto&&EM.selN)EM.rvs.flat=Math.round(emMean(t));EM.pvOn=EM.selN>0;emRPreview()}
  else if(a==='rmean'){if(EM.selN){pushSnapshot();EM.rvs.flat=Math.round(emMean(t));EM.flatAuto=true;EM.pvOn=true;emRPreview()}}}
