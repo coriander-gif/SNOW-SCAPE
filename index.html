@@ -476,9 +476,21 @@ function tRelax(t,i0,j0,i1,j1){const K=t.k,cs=t.cs,bb=[Math.max(0,i0-2),Math.max
  for(let it=0;it<2;it++)for(let j=bb[1];j<=bb[3];j++)for(let i=bb[0];i<=bb[2];i++){const k=j*K+i;if(!t.pd[k] || t.locks[k])continue;const b0=t.h0[k]+t.dl[k];
   for(const nk of [i>0?k-1:-1,i<K-1?k+1:-1,j>0?k-K:-1,j<K-1?k+K:-1]){if(nk<0)continue;const diff=t.h[k]-t.h[nk],al=Math.max(lim,Math.abs(b0-(t.h0[nk]+t.dl[nk])));if(diff>al)t.pd[k]-=(diff-al)*.5;else if(diff<-al)t.pd[k]+=(-diff-al)*.5;t.h[k]=b0+t.pd[k]}}
  return bb}
-function tStampX(t,x,z,R,mode,str,ref){const K=t.k,cs=t.cs,S2=t.size/2;if(!t.pd)t.pd=new Float32Array(K*K);
+function tStampX(t,x,z,R,mode,str,ref){const K=t.k,cs=t.cs,S2=t.size/2;
+ if(mode!=='rock'&&!t.pd)t.pd=new Float32Array(K*K);
  if(mode==='rock'&&!t.rd)t.rd=new Uint8Array(K*K);
  const i0=Math.max(0,Math.floor((x-R+S2)/cs)),i1=Math.min(K-1,Math.ceil((x+R+S2)/cs)),j0=Math.max(0,Math.floor((z-R+S2)/cs)),j1=Math.min(K-1,Math.ceil((z+R+S2)/cs));
+ 
+ if(mode==='rock'){
+  let changed = false;
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+   const k=j*K+i;if(t.locks[k])continue;
+   const d=Math.hypot(-S2+i*cs-x,-S2+j*cs-z);const w=d>=R?0:.5*(1+Math.cos(Math.PI*d/R));
+   if(w>0.1 && !t.deadRocks[k]){t.rd[k]=1; changed=true;}
+  }
+  return changed ? [i0,j0,i1,j1] : null;
+ }
+
  const a0=Math.max(0,i0-1),a1=Math.min(K-1,i1+1),c0=Math.max(0,j0-1),c1=Math.min(K-1,j1+1),W=a1-a0+1,Hs=new Float32Array(W*(c1-c0+1));
  for(let j=c0;j<=c1;j++)for(let i=a0;i<=a1;i++)Hs[(j-c0)*W+(i-a0)]=t.h[j*K+i];
  const hs=(i,j)=>Hs[(Math.min(c1,Math.max(c0,j))-c0)*W+(Math.min(a1,Math.max(a0,i))-a0)];
@@ -492,7 +504,6 @@ function tStampX(t,x,z,R,mode,str,ref){const K=t.k,cs=t.cs,S2=t.size/2;if(!t.pd)
    const tg=Math.max(.1,.7-.06*str),gm=Math.hypot(gx,gz);if(gm>tg){gx*=tg/gm;gz*=tg/gm}}}
  const kf=mode==='smooth'?Math.min(1,.09*str):mode==='flat'?Math.min(1,.12*str+.08):.1+.04*str,rf=ref==null?tSample(t,x,z):ref;
  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*K+i;if(t.locks[k])continue;const w=wt(i,j);if(!w)continue;
-  if(mode==='rock'){if(w>0.1)t.rd[k]=1;continue;}
   const h=hs(i,j),bk=t.h0[k]+t.dl[k];let T;
   if(mode==='smooth')T=(4*h+2*(hs(i-1,j)+hs(i+1,j)+hs(i,j-1)+hs(i,j+1))+hs(i-1,j-1)+hs(i+1,j-1)+hs(i-1,j+1)+hs(i+1,j+1))/16;
   else if(mode==='flat')T=rf;
@@ -538,7 +549,70 @@ function emStampAt(p){const t=MV.t,R=EM.size,amt=(EM.tool==='dig'?-1:1)*EM.str*.
  if(!EM.last)pts=[p];else{const dx=p.x-EM.last.x,dz=p.z-EM.last.z,L=Math.hypot(dx,dz);if(L<sp)return;const n=Math.min(12,Math.floor(L/sp));for(let i=1;i<=n;i++)pts.push({x:EM.last.x+dx*i*sp/L,z:EM.last.z+dz*i*sp/L})}
  let bb=null;for(const q of pts){bb=emUnion(bb,emApply(t,q.x,q.z,R,amt));EM.last=q}
  EM.pb=emUnion(EM.pb,bb);mvEditRefresh(t,bb,false);emRefresh()}
-function emDown(e,P){if(!EM.on||!MV.t)return;if(EM.mode==='region')return emRDown(e,P);if(P.size>1){EM.stroking=false;EM.last=null;return}if(EM.tool==='view'||(e.pointerType==='mouse'&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;EM.stroking=true;EM.last=null;EM.pick=p;EM.ref=tSample(MV.t,p.x,p.z);emStampAt(p);emRingUpdate(p)}
+
+/* Undo/Redo スナップショット管理 */
+function emSaveSnapshot() {
+  const t = MV.t;
+  if (!t) return null;
+  return {
+    pd: t.pd ? new Float32Array(t.pd) : null,
+    rd: t.rd ? new Uint8Array(t.rd) : null,
+    pb: EM.pb ? [...EM.pb] : null,
+    sel: EM.sel ? new Uint8Array(EM.sel) : null,
+    selN: EM.selN,
+    selBB: EM.selBB ? [...EM.selBB] : null,
+    op: EM.op,
+    rvs: {...EM.rvs}
+  };
+}
+function pushSnapshot() {
+  const snap = emSaveSnapshot();
+  if(!snap) return;
+  EM.stack.push(snap);
+  if(EM.stack.length > 30) EM.stack.shift();
+  EM.redo = [];
+  emRefresh();
+}
+function emRestoreSnapshot(t, snap) {
+  if (t.pd || t.rd) tCancel(t, [0,0,t.k-1,t.k-1]);
+  t.pd = snap.pd ? new Float32Array(snap.pd) : null;
+  t.rd = snap.rd ? new Uint8Array(snap.rd) : null;
+  EM.pb = snap.pb ? [...snap.pb] : null;
+  if (snap.sel) {
+    if(!EM.sel) EM.sel = new Uint8Array(t.k*t.k);
+    EM.sel.set(snap.sel);
+  } else {
+    EM.sel = null;
+  }
+  EM.selN = snap.selN || 0;
+  EM.selBB = snap.selBB ? [...snap.selBB] : null;
+  EM.op = snap.op;
+  if (snap.rvs) EM.rvs = {...snap.rvs};
+  
+  if (t.pd) {
+    for (let k = 0; k < t.k * t.k; k++) {
+      if (t.pd[k] !== 0) t.h[k] = t.h0[k] + t.dl[k] + t.pd[k];
+    }
+  }
+  mvEditRefresh(t, EM.pb || [0,0,t.k-1,t.k-1], false);
+  emColorBB(EM.selBB || [0,0,t.k-1,t.k-1]);
+}
+function emUndo(){
+  const t = MV.t;
+  if(!t || EM.stack.length === 0) return;
+  EM.redo.push(emSaveSnapshot());
+  emRestoreSnapshot(t, EM.stack.pop());
+  emRefresh();
+}
+function emRedo(){
+  const t = MV.t;
+  if(!t || EM.redo.length === 0) return;
+  EM.stack.push(emSaveSnapshot());
+  emRestoreSnapshot(t, EM.redo.pop());
+  emRefresh();
+}
+
+function emDown(e,P){if(!EM.on||!MV.t)return;if(EM.mode==='region')return emRDown(e,P);if(P.size>1){EM.stroking=false;EM.last=null;return}if(EM.tool==='view'||(e.pointerType==='mouse'&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;pushSnapshot();EM.stroking=true;EM.last=null;EM.pick=p;EM.ref=tSample(MV.t,p.x,p.z);emStampAt(p);emRingUpdate(p)}
 function emMove(e,P,dx,dy){if(EM.on&&EM.mode==='region')return emRMove(e,P);if(!EM.on||!EM.stroking||P.size!==1)return false;const p=mvPick(e.clientX,e.clientY);if(p){EM.pick=p;emStampAt(p);emRingUpdate(p)}return true}
 function emUp(e,P){if(EM.on&&EM.mode==='region'){emRUp(e,P);return}if(EM.stroking&&P.size<=1){EM.stroking=false;EM.last=null;emRefresh()}}
 function emHover(e){if(EM.on&&EM.mode==='region'){emRHover(e);return}if(!EM.on||EM.tool==='view'||!MV.t)return;const p=mvPick(e.clientX,e.clientY);EM.pick=p;emRingUpdate(p)}
@@ -549,7 +623,7 @@ function emSave(t){
   if(dr.length>0)G.map.deadRocks=dr;else delete G.map.deadRocks;
  }
 }
-function emCancel(){EM.pvOn=false;const t=MV.t;if(!t||!EM.pb)return;const bb=EM.pb;tCancel(t,bb);EM.pb=null;mvEditRefresh(t,bb,false);emRefresh()}
+function emCancel(){EM.pvOn=false;const t=MV.t;if(!t||!EM.pb)return;const bb=EM.pb;tCancel(t,bb);EM.pb=null;EM.stack=[];EM.redo=[];mvEditRefresh(t,bb,false);emRefresh()}
 
 // 工事費用計算
 function emCalcCost(t, bb) {
@@ -573,9 +647,9 @@ function emCalcCost(t, bb) {
   }
  }
  if (n === 0) return {n:0, cost:0, days:0};
- const U_DIG = 150, U_FILL = 200, U_AREA = 100, U_ROCK = 500;
+ const U_DIG = 20, U_FILL = 30, U_AREA = 15, U_ROCK = 30;
  const cost = Math.floor(digVol * U_DIG + fillVol * U_FILL + area * U_AREA + rockArea * U_ROCK);
- const days = Math.max(1, Math.floor(area / 3000 + (digVol + fillVol) / 4000 + rockArea / 1000));
+ const days = Math.max(1, Math.ceil(area / 20000 + Math.abs(digVol + fillVol) / 50000 + rockArea / 15000));
  return {n, mx, area, digVol, fillVol, rockArea, cost, days};
 }
 
@@ -601,11 +675,10 @@ function emCommit(){
  if(pt.idx) for(let i=0; i<pt.idx.length; i++) t.locks[pt.idx[i]] = 1;
  if(pt.ridx) for(let i=0; i<pt.ridx.length; i++) t.locks[pt.ridx[i]] = 1;
  emSave(t); saveGame(true);
+ EM.stack=[]; EM.redo=[];
  mvEditRefresh(t, bb, false); emRefresh(); upd();
  toast("地形造成工事を開始しました");
 }
-function emUndo(){toast("工事の取消は、CONSTRUCTION(工事管理)メニューから行ってください");}
-function emRedo(){toast("やり直し機能は現在無効です");}
 function emTool(v){EM.tool=v;if(EM.stroking){EM.stroking=false;EM.last=null}if(MV.cv)MV.cv.style.cursor=v==='view'?'grab':'crosshair';emRingUpdate(v==='view'?null:EM.pick);emRefresh()}
 function emPanel(){return `<div class="empanel" id="empanel"><div class="emh"><b>地形造成</b><span id="em-st" class="note"></span></div><div class="seg emmode"><button class="btn" data-e="mode" data-v="brush">自由ブラシ</button><button class="btn" data-e="mode" data-v="region">区画指定</button></div><div id="em-brush"><div class="seg emseg"><button class="btn" data-e="tool" data-v="dig">掘削</button><button class="btn" data-e="tool" data-v="raise">隆起</button><button class="btn" data-e="tool" data-v="smooth">平滑化</button><button class="btn" data-e="tool" data-v="flat">平坦化</button><button class="btn" data-e="tool" data-v="slope">斜面調整</button><button class="btn" data-e="tool" data-v="rock">岩場除去</button><button class="btn" data-e="tool" data-v="view">視点移動</button></div><p class="emn" id="em-h"></p><label class="emr"><span>ブラシサイズ <b id="em-szv"></b></span><input type="range" id="em-size" min="15" max="100" value="${EM.size}"></label><label class="emr"><span>加工強度 <b id="em-stv"></b></span><input type="range" id="em-str" min="1" max="10" value="${EM.str}"></label></div><div id="em-region" style="display:none"><div class="seg emseg2"><button class="btn" data-e="rtool" data-v="rect">矩形</button><button class="btn" data-e="rtool" data-v="paint">なぞり</button><button class="btn" data-e="rtool" data-v="view">視点移動</button></div><div class="seg emseg2"><button class="btn" id="em-add" data-e="radd">追加</button><button class="btn" id="em-sub" data-e="rsub">解除</button><button class="btn" data-e="rclear">選択クリア</button></div><p class="emn" id="em-sel"></p><label class="emr" id="em-sz2"><span>なぞりのサイズ <b id="em-sz2v"></b></span><input type="range" id="em-size2" min="15" max="100" value="${EM.size}"></label><div class="seg emseg2"><button class="btn" data-e="rop" data-v="dig">掘削</button><button class="btn" data-e="rop" data-v="fill">盛土</button><button class="btn" data-e="rop" data-v="flat">平坦化</button><button class="btn" data-e="rop" data-v="slope">斜面調整</button><button class="btn" data-e="rop" data-v="rock">岩場除去</button></div><label class="emr" id="em-vl-w"><span id="em-vl"></span><input type="range" id="em-val" min="1" max="200" value="20"></label><button class="btn" id="em-mean" data-e="rmean" style="display:none">選択範囲の平均標高を取得</button><label class="emr"><span>境界のなだらかさ <b id="em-fev"></b></span><input type="range" id="em-fe" min="1" max="12" value="${EM.rf}"></label></div><div class="emb"><button class="btn p" data-e="commit" id="em-c">工事開始</button><button class="btn" data-e="cancel" id="em-x">キャンセル</button><button class="btn" data-e="undo" id="em-u">取消</button><button class="btn" data-e="redo" id="em-r">やり直す</button><button class="btn" data-e="exit">編集終了</button></div><p class="emn">プレビューを確認して工事を開始します。費用は資金から引かれます。施工中の範囲は完了まで別の編集ができません。</p></div>`}
 function emRefresh(){const t=MV.t,q=s=>document.getElementById(s);if(!q('empanel'))return;
@@ -624,7 +697,7 @@ function emRefresh(){const t=MV.t,q=s=>document.getElementById(s);if(!q('empanel
  q('em-st').innerHTML=stat.n?`対象 ${stat.n}点 最大 ${Math.round(stat.mx)}m${costStr}`:'';
  emRegionRefresh();
  const canAfford = stat.cost > 0 && G && G.funds >= stat.cost;
- q('em-c').disabled=!stat.n || !canAfford; q('em-x').disabled=!stat.n; q('em-u').disabled=true; q('em-r').disabled=true;}
+ q('em-c').disabled=!stat.n || !canAfford; q('em-x').disabled=!stat.n; q('em-u').disabled=EM.stack.length===0; q('em-r').disabled=EM.redo.length===0;}
 function emEnter(){if(!MV.ok||!MV.t||!MV.box){toast('3Dマップを表示できないため、地形編集は利用できません');return}emGfx();EM.on=true;MV.box.insertAdjacentHTML('beforeend',emPanel());MV.cv.style.cursor=EM.tool==='view'?'grab':'crosshair';emRefresh();mvDraw()}
 function emExit(){if(EM.pb){emCancel();toast('未確定のプレビューを破棄しました')}EM.on=false;EM.stroking=false;EM.drag=null;if(MV.geo&&MV.t)mvColor(G&&G.wx?G.wx.depth:0);const p=document.getElementById('empanel');if(p)p.remove();if(EM.ring)EM.ring.visible=false;if(MV.cv)MV.cv.style.cursor='grab';mvDraw()}
 function emToggle(){if(EM.on)emExit();else emEnter()}
@@ -632,7 +705,8 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-e]');if(!b
 document.addEventListener('input',e=>{if(e.target.id==='em-size'){EM.size=+e.target.value;emRefresh();if(EM.pick)emRingUpdate(EM.pick)}else if(e.target.id==='em-str'){EM.str=+e.target.value;emRefresh()}else emRegionInput(e)});
 
 /* 区画指定 */
-function tRegionPreview(t,sel,op,v,F){const K=t.k,cs=t.cs;if(!t.pd)t.pd=new Float32Array(K*K);
+function tRegionPreview(t,sel,op,v,F){const K=t.k,cs=t.cs;
+ if(op!=='rock'&&!t.pd)t.pd=new Float32Array(K*K);
  if(op==='rock'&&!t.rd)t.rd=new Uint8Array(K*K);
  let i0=K,j0=K,i1=-1,j1=-1,n=0;
  for(let j=0;j<K;j++)for(let i=0;i<K;i++)if(sel[j*K+i]){n++;if(i<i0)i0=i;if(i>i1)i1=i;if(j<j0)j0=j;if(j>j1)j1=j}
@@ -647,10 +721,11 @@ function tRegionPreview(t,sel,op,v,F){const K=t.k,cs=t.cs;if(!t.pd)t.pd=new Floa
   const det=cxx*czz-cxz*cxz;if(det>1e-6){gx=(cxh*czz-czh*cxz)/det;gz=(czh*cxx-cxh*cxz)/det}const tg=Math.tan(v*Math.PI/180),gm=Math.hypot(gx,gz);if(gm>tg){gx*=tg/gm;gz*=tg/gm}}
  for(let j=f0;j<=f1;j++)for(let i=e0;i<=e1;i++){const dist=D[(j-f0)*W+(i-e0)]/3,w=dist<=0?1:dist>=F?0:.5*(1+Math.cos(Math.PI*dist/F));if(!w)continue;
   const k=j*K+i;if(t.locks[k])continue;
-  if(op==='rock'){if(w>0.1)t.rd[k]=1;continue;}
+  if(op==='rock'){if(w>0.1&&!t.deadRocks[k])t.rd[k]=1;continue;}
   const bk=t.h0[k]+t.dl[k];let dh;
   if(op==='dig')dh=-v;else if(op==='fill')dh=v;else if(op==='flat')dh=v-bk;else dh=mh+gx*(i-mx)*cs*10+gz*(j-mz)*cs*10-bk;
   let nv=dh*w;nv=Math.max(-ED_MAX-t.dl[k],Math.min(ED_MAX-t.dl[k],nv));nv=Math.max(ED_MIN_E-bk,Math.min(ED_MAX_E-bk,nv));t.pd[k]=nv;t.h[k]=bk+nv}
+ if(op==='rock') return [e0,f0,e1,f1];
  return tRelax(t,e0,f0,e1,f1)}
 function emSelEnsure(t){if(!EM.sel||EM.sel.length!==t.k*t.k){EM.sel=new Uint8Array(t.k*t.k);EM.bd=new Uint8Array(t.k*t.k);EM.selN=0;EM.selBB=null}}
 function emSelBorder(t){const K=t.k,s=EM.sel,b=EM.bd;let n=0,i0=K,j0=K,i1=-1,j1=-1;
@@ -672,7 +747,7 @@ function emPaintTo(t,p){const R=EM.size,sp=Math.max(t.cs*.8,R*.3),dg=EM.drag;let
  let bb=null;for(const q of pts){bb=emU(bb,emDiscApply(t,q.x,q.z,R,dg.add));EM.last=q}dg.bb=emU(dg.bb,bb);emColorBB(bb)}
 function emRDown(e,P){const t=MV.t;if(!t)return;emSelEnsure(t);
  if(P.size>1){const dg=EM.drag,bb=dg?(dg.bb||[dg.i0,dg.j0,dg.i1,dg.j1]):null;EM.drag=null;EM.stroking=false;EM.last=null;emColorBB(bb);return}
- if(EM.rtool==='view'||(e.pointerType==='mouse'&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;EM.stroking=true;const v=emVert(t,p);
+ if(EM.rtool==='view'||(e.pointerType==='mouse'&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;pushSnapshot();EM.stroking=true;const v=emVert(t,p);
  if(EM.rtool==='rect'){EM.drag={k:'rect',ai:v[0],aj:v[1],i0:v[0],i1:v[0],j0:v[1],j1:v[1],add:!EM.rsub};emColorBB([v[0],v[1],v[0],v[1]])}
  else{EM.drag={k:'paint',add:!EM.rsub,bb:null};EM.last=null;emPaintTo(t,p);emRingUpdate(p)}}
 function emRMove(e,P){if(!EM.stroking||!EM.drag||P.size!==1)return false;const t=MV.t,dg=EM.drag,p=mvPick(e.clientX,e.clientY);if(!p)return true;
@@ -685,11 +760,11 @@ function emRHover(e){if(EM.rtool!=='paint'||!MV.t){emRingUpdate(null);return}EM.
 function emRegionClick(a,b){const t=MV.t;if(!t)return;const v=b.dataset.v;
  if(a==='mode'){if(EM.mode===v)return;if(EM.pb){emCancel();toast('未確定のプレビューを破棄しました')}EM.pvOn=false;EM.mode=v;EM.drag=null;EM.stroking=false;if(MV.cv)MV.cv.style.cursor=(v==='region'?EM.rtool==='view':EM.tool==='view')?'grab':'crosshair';emRingUpdate(null);if(MV.geo)mvColor(G&&G.wx?G.wx.depth:0);mvDraw();emRefresh()}
  else if(a==='rtool'){EM.rtool=v;EM.drag=null;EM.stroking=false;if(MV.cv)MV.cv.style.cursor=v==='view'?'grab':'crosshair';emRingUpdate(null);emRefresh()}
- else if(a==='radd'){EM.rsub=false;emRefresh()}
- else if(a==='rsub'){EM.rsub=true;emRefresh()}
- else if(a==='rclear'){emSelEnsure(t);const bb=EM.selBB;EM.sel.fill(0);emSelBorder(t);EM.pvOn=false;emRPreview();emColorBB(bb);emRefresh()}
- else if(a==='rop'){EM.op=v;if(v==='flat'&&EM.flatAuto&&EM.selN)EM.rvs.flat=Math.round(emMean(t));EM.pvOn=EM.selN>0;emRPreview()}
- else if(a==='rmean'){if(EM.selN){EM.rvs.flat=Math.round(emMean(t));EM.flatAuto=true;EM.pvOn=true;emRPreview()}}}
+ else if(a==='radd'){pushSnapshot();EM.rsub=false;emRefresh()}
+ else if(a==='rsub'){pushSnapshot();EM.rsub=true;emRefresh()}
+ else if(a==='rclear'){emSelEnsure(t);pushSnapshot();const bb=EM.selBB;EM.sel.fill(0);emSelBorder(t);EM.pvOn=false;emRPreview();emColorBB(bb);emRefresh()}
+ else if(a==='rop'){pushSnapshot();EM.op=v;if(v==='flat'&&EM.flatAuto&&EM.selN)EM.rvs.flat=Math.round(emMean(t));EM.pvOn=EM.selN>0;emRPreview()}
+ else if(a==='rmean'){if(EM.selN){pushSnapshot();EM.rvs.flat=Math.round(emMean(t));EM.flatAuto=true;EM.pvOn=true;emRPreview()}}}
 function emRegionInput(e){const id=e.target.id;
  if(id==='em-val'){EM.rvs[EM.op]=+e.target.value;if(EM.op==='flat')EM.flatAuto=false;EM.pvOn=EM.selN>0;emRPreview()}
  else if(id==='em-fe'){EM.rf=+e.target.value;EM.pvOn=EM.selN>0;emRPreview()}
