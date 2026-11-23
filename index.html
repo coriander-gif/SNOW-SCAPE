@@ -570,7 +570,7 @@ function mvBind(cv){
  cv.addEventListener('webglcontextlost',e=>e.preventDefault());
  cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}});
 }
-function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button><button class="btn" data-m="courses">コース建設</button><button class="btn p" data-m="edit">地形造成工事</button></span></div>${CS.on?coursePanel():''}${EM.on?emPanel():''}`}
+function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button><button class="btn" data-m="courses">コース建設</button><button class="btn p" data-m="edit">地形造成工事</button></span></div>`}
 function layoutVars(){const h=$('.hd'),n=$('#nav'),s=document.documentElement.style;s.setProperty('--hh',(h?h.offsetHeight:64)+'px');s.setProperty('--nh',n&&getComputedStyle(n).position==='fixed'?n.offsetHeight+'px':'0px')}
 function mapPage(){return '<div class="map m3 big" id="mapbox"></div>'}
 function seasonOf(d){return['冬','冬','早春','春','春','初夏','夏','夏','初秋','秋','晩秋','初冬'][+d.split('-')[1]-1]}
@@ -598,7 +598,7 @@ function courseMetrics(points,t){
 function courseMakeGeometry(c,t){
  const m=courseMetrics(c.points,t),p=m.points;if(p.length<2)return null;const pos=[],idx=[],half=c.width/2;
  for(let i=0;i<p.length;i++){const a=p[Math.max(0,i-1)],b=p[Math.min(p.length-1,i+1)],dx=b[0]-a[0],dz=b[1]-a[1],L=Math.hypot(dx,dz)||1,nx=-dz/L,nz=dx/L;
-  for(const side of [-1,1]){const x=p[i][0]+nx*half*side,z=p[i][1]+nz*half*side,y=yOf(t,tSample(t,x,z))+1.8;pos.push(x,y,z)}
+  for(const side of [-1,1]){const x=p[i][0]+nx*half*side,z=p[i][1]+nz*half*side,y=yOf(t,tSample(t,x,z))+.25;pos.push(x,y,z)}
   if(i<p.length-1){const k=i*2;idx.push(k,k+1,k+2,k+1,k+3,k+2)}}
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return{geometry:g,metrics:m};
 }
@@ -610,7 +610,7 @@ function mvCourseRefresh(){
 }
 function courseLinePreview(){
  if(!MV.sc||!MV.t)return;if(CS.preview){MV.sc.remove(CS.preview);CS.preview.geometry.dispose();CS.preview.material.dispose();CS.preview=null}
- if(CS.points.length<2)return;const pts=CS.points.map(p=>new THREE.Vector3(p[0],yOf(MV.t,tSample(MV.t,p[0],p[1]))+3,p[1])),geo=new THREE.BufferGeometry().setFromPoints(pts),line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffd43b,depthTest:false}));line.renderOrder=20;MV.sc.add(line);CS.preview=line;mvDraw();
+ if(CS.points.length<2)return;const pts=CS.points.map(p=>new THREE.Vector3(p[0],yOf(MV.t,tSample(MV.t,p[0],p[1]))+.45,p[1])),geo=new THREE.BufferGeometry().setFromPoints(pts),line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffd43b,depthTest:false}));line.renderOrder=20;MV.sc.add(line);CS.preview=line;mvDraw();
 }
 function courseRemovePreview(){if(CS.preview&&MV.sc){MV.sc.remove(CS.preview);CS.preview.geometry.dispose();CS.preview.material.dispose()}CS.preview=null}
 function courseFinish(points){
@@ -656,8 +656,9 @@ document.addEventListener('click',e=>{
  else if(a==='select'){CS.selected=id;const c=list.find(x=>x.id===id);if(c)CS.width=c.width;courseRefreshPanel()}
  else if(a==='delete'){const i=list.findIndex(x=>x.id===id);if(i>=0&&confirm('このコースを削除しますか？')){const old=list.splice(i,1)[0];if(!saveGame(true)){list.splice(i,0,old);toast('保存に失敗したため削除を取り消しました')}else{if(CS.selected===id)CS.selected=null;mvCourseRefresh();courseRefreshPanel()}}}
 });
+document.addEventListener('change',e=>{if(e.target.id==='cs-width'&&CS.on){if(!saveGame(true))toast('幅の変更を保存できませんでした')}});
 document.addEventListener('input',e=>{
- if(e.target.id==='cs-width'&&CS.on){CS.width=+e.target.value;const c=courseData().find(x=>x.id===CS.selected);if(c){c.width=CS.width;const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';mvCourseRefresh();saveGame(true)}else{const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m'}}
+ if(e.target.id==='cs-width'&&CS.on){CS.width=+e.target.value;const c=courseData().find(x=>x.id===CS.selected);if(c){c.width=CS.width;const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';mvCourseRefresh()}else{const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m'}}
 });
 /* ===== v0.4.0 地形編集・造成工事システム ===== */
 const ED_MAX=800,ED_MIN_E=400,ED_MAX_E=3400,ED_TALUS=1.5;
@@ -1003,7 +1004,7 @@ function emRefresh(){const t=MV.t,q=s=>document.getElementById(s);if(!q('empanel
  q('em-c').disabled=!stat.n || !canAfford; q('em-x').disabled=!stat.n; q('em-u').disabled=EM.stack.length===0; q('em-r').disabled=EM.redo.length===0;}
 function emEnter(){if(!MV.ok||!MV.t||!MV.box){toast('3Dマップを表示できないため、地形編集は利用できません');return}emGfx();EM.on=true;MV.box.insertAdjacentHTML('beforeend',emPanel());MV.cv.style.cursor=EM.tool==='view'?'grab':'crosshair';emRefresh();mvDraw()}
 function emExit(){if(EM.pb){emCancel();toast('未確定のプレビューを破棄しました')}EM.on=false;EM.stroking=false;EM.drag=null;if(MV.geo&&MV.t)mvColor(G&&G.wx?G.wx.depth:0);const p=document.getElementById('empanel');if(p)p.remove();if(EM.ring)EM.ring.visible=false;if(MV.cv)MV.cv.style.cursor='grab';mvDraw()}
-function emToggle(){if(EM.on)emExit();else emEnter()}
+function emToggle(){if(CS.on)courseToggle();if(EM.on)emExit();else emEnter()}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-e]');if(!b||!MV.ok||b.disabled)return;const a=b.dataset.e;if(a==='tool')emTool(b.dataset.v);else if(a==='commit')emCommit();else if(a==='cancel')emCancel();else if(a==='undo')emUndo();else if(a==='redo')emRedo();else if(a==='exit')emExit();else emRegionClick(a,b)});
 document.addEventListener('input',e=>{if(e.target.id==='em-size'){EM.size=+e.target.value;emRefresh();if(EM.pick)emRingUpdate(EM.pick)}else if(e.target.id==='em-str'){EM.str=+e.target.value;emRefresh()}else emRegionInput(e)});
 
@@ -1199,7 +1200,7 @@ document.addEventListener("click",ev=>{
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.4.0</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.5.0 Alpha</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
