@@ -586,7 +586,22 @@ const COURSE_COLORS={初級:0x32b86b,中級:0x3488e8,上級:0xe34b4b,最上級:0
 function validCourseList(a){
  if(a===undefined)return true;
  if(!Array.isArray(a)||a.length>100)return false;
- return a.every(c=>c&&typeof c==='object'&&typeof c.id==='string'&&c.id.length<=80&&typeof c.name==='string'&&c.name.length<=60&&Array.isArray(c.points)&&c.points.length>=2&&c.points.length<=2000&&c.points.every(p=>Array.isArray(p)&&p.length===2&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<=1200&&Math.abs(p[1])<=1200)&&Number.isFinite(c.width)&&c.width>=10&&c.width<=150&&(c.nodeA===undefined||typeof c.nodeA==='string'&&c.nodeA.length<=80)&&(c.nodeB===undefined||typeof c.nodeB==='string'&&c.nodeB.length<=80));
+ const ids=new Set(),nodes=new Map();
+ for(const c of a){
+  if(!c||typeof c!=='object'||typeof c.id!=='string'||!c.id||c.id.length>80||ids.has(c.id)||typeof c.name!=='string'||c.name.length>60||!Array.isArray(c.points)||c.points.length<2||c.points.length>2000||!c.points.every(p=>Array.isArray(p)&&p.length===2&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<=1200&&Math.abs(p[1])<=1200)||!Number.isFinite(c.width)||c.width<10||c.width>100)return false;
+  ids.add(c.id);
+  for(const side of ['A','B']){
+   const key='node'+side,node=c[key];
+   if(node!==undefined){
+    if(typeof node!=='string'||!node||node.length>80)return false;
+    const p=c.points[side==='A'?0:c.points.length-1],entry=nodes.get(node);
+    if(entry&&Math.hypot(entry.x-p[0],entry.z-p[1])>0.5)return false;
+    if(entry)entry.count++;else nodes.set(node,{x:p[0],z:p[1],count:1});
+   }
+  }
+ }
+ for(const n of nodes.values())if(n.count<2)return false;
+ return true;
 }
 function courseData(){if(!G.map.courses)G.map.courses=[];return G.map.courses}
 function courseSample(points,t){
@@ -634,18 +649,41 @@ function courseFinish(points){
  const clean=[points[0]];for(let i=1;i<points.length;i++)if(Math.hypot(points[i][0]-clean[clean.length-1][0],points[i][1]-clean[clean.length-1][1])>=4)clean.push(points[i]);
  if(clean.length<2||courseMetrics(clean,t).length<30){toast('コースが短すぎます。もう少し長く描いてください');return}
  const list=courseData();if(list.length>=100){toast('コースは最大100本までです');return}
- const oldNodes=list.map(c=>({c,nodeA:c.nodeA,nodeB:c.nodeB})),snapRadius=18;
- const findJoin=p=>{let best=null,dist=snapRadius;for(const c of list){for(const side of ['A','B']){const q=c.points[side==='A'?0:c.points.length-1],d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<dist){dist=d;best={c,side,p:q}}}}return best};
- const ja=findJoin(clean[0]),jb=findJoin(clean[clean.length-1]);
- if(ja)clean[0]=[ja.p[0],ja.p[1]];if(jb)clean[clean.length-1]=[jb.p[0],jb.p[1]];
- if(ja&&jb&&Math.hypot(clean[0][0]-clean[clean.length-1][0],clean[0][1]-clean[clean.length-1][1])<4){toast('同じ接続点を始点と終点に指定できません');return}
- const nodeFor=join=>{if(!join)return null;const key=join.side==='A'?'nodeA':'nodeB';if(!join.c[key])join.c[key]='N_'+Date.now().toString(36)+'_'+(++CS.seq).toString(36);return join.c[key]};
- const nodeA=nodeFor(ja),nodeB=nodeFor(jb);
+ const before=JSON.stringify(list),previousSelected=CS.selected,snapRadius=18;
+ const makeNode=()=> 'N_'+Date.now().toString(36)+'_'+(++CS.seq).toString(36);
+ const pathLength=pts=>{let n=0;for(let i=1;i<pts.length;i++)n+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);return n};
+ const attachPoint=p=>{
+  let best=null;
+  for(const c of list)for(let i=0;i<c.points.length-1;i++){
+   const a=c.points[i],b=c.points[i+1],dx=b[0]-a[0],dz=b[1]-a[1],ll=dx*dx+dz*dz;if(ll<1)continue;
+   const u=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dz)/ll)),q=[a[0]+u*dx,a[1]+u*dz],d=Math.hypot(p[0]-q[0],p[1]-q[1]);
+   if(d<snapRadius&&(!best||d<best.d))best={c,i,u,q,d};
+  }
+  if(!best)return null;
+  const {c,i,u,q}=best,seg=Math.hypot(c.points[i+1][0]-c.points[i][0],c.points[i+1][1]-c.points[i][1]);
+  const beforeLen=pathLength(c.points.slice(0,i+1))+seg*u,afterLen=pathLength(c.points.slice(i+1))+seg*(1-u);
+  if(beforeLen<15){if(!c.nodeA)c.nodeA=makeNode();return{point:[...c.points[0]],node:c.nodeA}}
+  if(afterLen<15){if(!c.nodeB)c.nodeB=makeNode();return{point:[...c.points[c.points.length-1]],node:c.nodeB}}
+  if(list.length>=99)return null;
+  const left=c.points.slice(0,i+1).concat([[...q]]),right=[[...q]].concat(c.points.slice(i+1)),junction=makeNode(),oldNodeB=c.nodeB;
+  c.points=left;c.nodeB=junction;
+  const split={id:'C_'+Date.now().toString(36)+'_'+(++CS.seq).toString(36),name:(c.name+'-分割').slice(0,60),points:right,width:c.width,nodeA:junction};
+  if(oldNodeB)split.nodeB=oldNodeB;
+  list.push(split);
+  return{point:[...q],node:junction};
+ };
+ const aJoin=attachPoint(clean[0]);if(aJoin)clean[0]=aJoin.point;
+ const bJoin=attachPoint(clean[clean.length-1]);if(bJoin)clean[clean.length-1]=bJoin.point;
+ if(aJoin&&bJoin&&Math.hypot(clean[0][0]-clean[clean.length-1][0],clean[0][1]-clean[clean.length-1][1])<4){list.splice(0,list.length,...JSON.parse(before));toast('同じ接続点を始点と終点に指定できません');return}
  const id='C_'+Date.now().toString(36)+'_'+(++CS.seq).toString(36),c={id,name:'コース'+String(list.length+1).padStart(2,'0'),points:clean,width:CS.width};
- if(nodeA)c.nodeA=nodeA;if(nodeB)c.nodeB=nodeB;
- list.push(c);const previousSelected=CS.selected;CS.selected=id;courseRemovePreview();CS.points=[];CS.endpointFirst=null;
- if(!saveGame(true)){list.pop();for(const x of oldNodes){if(x.nodeA===undefined)delete x.c.nodeA;else x.c.nodeA=x.nodeA;if(x.nodeB===undefined)delete x.c.nodeB;else x.c.nodeB=x.nodeB}CS.selected=previousSelected;toast('保存に失敗したためコースを追加できませんでした');return}
- mvCourseRefresh();courseRefreshPanel();toast(ja||jb?'既存コースに接続して作成しました':'コースを作成しました');
+ if(aJoin)c.nodeA=aJoin.node;if(bJoin)c.nodeB=bJoin.node;
+ list.push(c);CS.selected=id;courseRemovePreview();CS.points=[];CS.endpointFirst=null;
+ if(!validCourseList(list)||!saveGame(true)){
+  list.splice(0,list.length,...JSON.parse(before));CS.selected=previousSelected;
+  toast('接続データまたは保存に問題があるため、コース作成を取り消しました');return;
+ }
+ mvCourseRefresh();courseRefreshPanel();
+ toast(aJoin||bJoin?'既存コースに接続しました（途中接続は既存コースを分割）':'コースを作成しました');
 }
 function courseToggle(){
  if(EM.on){toast('先に地形造成を終了してください');return}
@@ -656,7 +694,7 @@ function courseToggle(){
 function coursePanel(){
  const list=courseData(),selected=list.find(c=>c.id===CS.selected),w=selected?selected.width:CS.width;
  let rows='';for(const c of list){const m=courseMetrics(c.points,MV.t),co=(COURSE_COLORS[m.difficulty]||0x32b86b).toString(16).padStart(6,'0');rows+='<div class="csitem"><i class="csdot" style="background:#'+co+'"></i><button class="btn csname '+(CS.selected===c.id?'on':'')+'" data-cs="select" data-id="'+E(c.id)+'">'+E(c.name)+'・'+m.difficulty+'</button><button class="btn" data-cs="delete" data-id="'+E(c.id)+'">削除</button></div>'}
- return '<div class="cspanel" id="cspanel"><b>スキーコース建設</b><div class="seg"><button class="btn '+(CS.mode==='free'?'on':'')+'" data-cs="mode" data-v="free">自由描画</button><button class="btn '+(CS.mode==='ends'?'on':'')+'" data-cs="mode" data-v="ends">始点・終点指定</button></div><p class="emn">'+(CS.mode==='free'?'マップ上を1本指でなぞってコースを描きます。':'始点をタップし、続けて終点をタップします。')+' 既存コースの端点から18m以内で開始・終了すると自動接続します。</p><label class="emr"><span>コース幅 <b id="cs-width-label">'+Math.round(w)+' m</b></span><input id="cs-width" type="range" min="10" max="100" step="5" value="'+w+'"></label><div class="seg"><button class="btn" data-cs="cancel">描画キャンセル</button></div><div><b style="font-size:12px">作成済みコース ('+list.length+')</b><div class="cslist">'+(rows||'<p class="emn">まだコースはありません。</p>')+'</div></div><p class="emn">完成したコースは幅のある帯として表示します。難易度は地形の傾斜から自動判定します。</p><button class="btn" data-cs="close">コース建設を終了</button></div>';
+ return '<div class="cspanel" id="cspanel"><b>スキーコース建設</b><div class="seg"><button class="btn '+(CS.mode==='free'?'on':'')+'" data-cs="mode" data-v="free">自由描画</button><button class="btn '+(CS.mode==='ends'?'on':'')+'" data-cs="mode" data-v="ends">始点・終点指定</button></div><p class="emn">'+(CS.mode==='free'?'マップ上を1本指でなぞってコースを描きます。':'始点をタップし、続けて終点をタップします。')+' 既存コースの端点から18m以内で開始・終了すると自動接続します。</p><label class="emr"><span>コース幅 <b id="cs-width-label">'+Math.round(w)+' m</b></span><input id="cs-width" type="range" min="10" max="100" step="5" value="'+Math.min(100,Math.max(10,w))+'"></label><div class="seg"><button class="btn" data-cs="cancel">描画キャンセル</button></div><div><b style="font-size:12px">作成済みコース ('+list.length+')</b><div class="cslist">'+(rows||'<p class="emn">まだコースはありません。</p>')+'</div></div><p class="emn">完成したコースは幅のある帯として表示します。難易度は地形の傾斜から自動判定します。</p><button class="btn" data-cs="close">コース建設を終了</button></div>';
 }
 function courseRefreshPanel(){const el=document.getElementById('cspanel');if(!el)return;const fresh=document.createElement('div');fresh.innerHTML=coursePanel();el.replaceWith(fresh.firstElementChild)}
 function courseDown(e,P){
@@ -690,11 +728,23 @@ document.addEventListener('pointerdown',e=>{if(e.target&&e.target.id==='cs-width
 document.addEventListener('focusin',e=>{if(e.target&&e.target.id==='cs-width'&&CS.on)courseRememberWidth()});
 document.addEventListener('change',e=>{
  if(e.target.id==='cs-width'&&CS.on){
-  if(!saveGame(true)){const c=courseData().find(x=>x.id===CS.selected);if(c)c.width=CS.widthOriginal;CS.width=c?c.width:CS.widthOriginal;e.target.value=CS.width;const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';mvCourseRefresh();toast('保存に失敗したため幅の変更を元に戻しました')}
+  const c=courseData().find(x=>x.id===CS.selected);
+  if(!saveGame(true)){
+   if(c)c.width=CS.widthOriginal;
+   CS.width=c?c.width:CS.widthOriginal;e.target.value=CS.width;
+   const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';
+   mvCourseRefresh();toast('保存に失敗したため幅の変更を元に戻しました');
+  }else CS.widthOriginal=CS.width;
  }
 });
 document.addEventListener('input',e=>{
- if(e.target.id==='cs-width'&&CS.on){CS.width=+e.target.value;const c=courseData().find(x=>x.id===CS.selected);if(c){c.width=CS.width;const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';mvCourseRefresh()}else{const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m'}}
+ if(e.target.id==='cs-width'&&CS.on){
+  CS.width=Math.max(10,Math.min(100,+e.target.value));
+  const c=courseData().find(x=>x.id===CS.selected);if(c)c.width=CS.width;
+  e.target.value=CS.width;
+  const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';
+  if(c)mvCourseRefresh();
+ }
 });
 /* ===== v0.4.0 地形編集・造成工事システム ===== */
 const ED_MAX=800,ED_MIN_E=400,ED_MAX_E=3400,ED_TALUS=1.5;
