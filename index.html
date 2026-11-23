@@ -296,7 +296,7 @@ const STY={broad:['ニセコ・羊蹄山周辺','ルスツ周辺','大雪山周�
 const mulb=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
 const hstr=s=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0};
 function initMap(g){const s=hstr(g.mountain),ks=Object.keys(STY);let st=ks[s%ks.length];for(const k of ks)if(STY[k].includes(g.mountain))st=k;return{v:MAP_V,seed:s,style:st,owned:[]}}
-function validMap(m){return !!m&&typeof m==='object'&&m.v===MAP_V&&Number.isInteger(m.seed)&&has(STY,m.style)&&Array.isArray(m.owned)&&m.owned.every(x=>typeof x==='string')&&(m.ed===undefined||(typeof m.ed==='string'&&m.ed.length<=64000))&&(m.tv===undefined||typeof m.tv==='string')}
+function validMap(m){return !!m&&typeof m==='object'&&m.v===MAP_V&&Number.isInteger(m.seed)&&has(STY,m.style)&&Array.isArray(m.owned)&&m.owned.every(x=>typeof x==='string')&&(m.ed===undefined||(typeof m.ed==='string'&&m.ed.length<=64000))&&(m.edv===undefined||(Number.isInteger(m.edv)&&m.edv>=1&&m.edv<=2))&&(m.tv===undefined||typeof m.tv==='string')}
 const TV='v3';
 function genTerrain(seed,style){
  const N=128,K=N+1,S=1152,cs=S/N,HM=cs*10,PS=8,R=mulb(seed),tab=new Float32Array(1024);
@@ -379,7 +379,7 @@ function genTerrain(seed,style){
  return{key:seed+'/'+style+'/'+TV,n:N,k:K,size:S,cs,base:BASE,rel:REL,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe),peaks:peakOut,ridges,valleys,flats:flats.map(f=>({x:f.x*S/2,z:f.z*S/2,r:f.r*S/2,elev:Math.round(esamp(f.x*S/2,f.z*S/2))})),cellDev:dev,cellMod:mod,cls:{q75,q88:qt(.88),q95:qt(.95),sg}}}
 function tSample(t,x,z){const fx=Math.max(0,Math.min(t.n-.001,(x+t.size/2)/t.cs)),fz=Math.max(0,Math.min(t.n-.001,(z+t.size/2)/t.cs)),i=Math.floor(fx),j=Math.floor(fz),u=fx-i,v=fz-j,K=t.k,h=t.h;return(h[j*K+i]*(1-u)+h[j*K+i+1]*u)*(1-v)+(h[(j+1)*K+i]*(1-u)+h[(j+1)*K+i+1]*u)*v}
 let TC=null;
-function getTerrain(g){if(!validMap(g.map))g.map=initMap(g);const k=g.map.seed+'/'+g.map.style+'/'+TV;const ed=(g.map.tv===TV&&g.map.ed)?g.map.ed:'';if(g.map.ed&&g.map.tv!==TV)toast('地形データのバージョンが異なるため、編集内容を適用できませんでした');if(!TC||TC.key!==k||TC.ed!==ed){TC=genTerrain(g.map.seed,g.map.style);tInitEdit(TC,ed);emReset()}return TC}
+function getTerrain(g){if(!validMap(g.map))g.map=initMap(g);const k=g.map.seed+'/'+g.map.style+'/'+TV;const ed=(g.map.tv===TV&&g.map.ed)?g.map.ed:'';if(g.map.ed&&g.map.tv!==TV)toast('地形データのバージョンが異なるため、編集内容を適用できませんでした');if(!TC||TC.key!==k||TC.ed!==ed){TC=genTerrain(g.map.seed,g.map.style);tInitEdit(TC,ed,g.map.edv);emReset()}return TC}
 
 /* 描画 */
 const YS=.15,MV={ok:null,q:0,tx:0,tz:0,d:900,yaw:.6,pitch:.9,key:'',box:null};
@@ -468,10 +468,10 @@ function seasonOf(d){return['冬','冬','早春','春','春','初夏','夏','夏
 
 /* ===== v0.3.3 地形編集・造成工事システム ===== */
 const ED_MAX=800,ED_MIN_E=400,ED_MAX_E=3400,ED_TALUS=1.5;
-function edEnc(dl){const n=dl.length,u=new Int16Array(n);let any=false;for(let i=0;i<n;i++){const v=Math.max(-ED_MAX,Math.min(ED_MAX,Math.round(dl[i])));u[i]=v;if(v)any=true}if(!any)return '';const b=new Uint8Array(u.buffer);let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s)}
-function edDec(str,n){try{const s=atob(str);if(s.length!==n*2)return null;const b=new Uint8Array(n*2);for(let i=0;i<b.length;i++)b[i]=s.charCodeAt(i);const u=new Int16Array(b.buffer),o=new Float32Array(n);for(let i=0;i<n;i++)o[i]=Math.max(-ED_MAX,Math.min(ED_MAX,u[i]));return o}catch(e){return null}}
+function edEnc(dl){const n=dl.length,u=new Int16Array(n);let any=false;for(let i=0;i<n;i++){const v=Math.max(-ED_MAX*10,Math.min(ED_MAX*10,Math.round(dl[i]*10)));u[i]=v;if(v)any=true}if(!any)return '';const b=new Uint8Array(u.buffer);let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s)}
+function edDec(str,n,version){try{const s=atob(str);if(s.length!==n*2)return null;const b=new Uint8Array(n*2);for(let i=0;i<b.length;i++)b[i]=s.charCodeAt(i);const u=new Int16Array(b.buffer),o=new Float32Array(n),scale=version===2?10:1;for(let i=0;i<n;i++)o[i]=Math.max(-ED_MAX,Math.min(ED_MAX,u[i]/scale));return o}catch(e){return null}}
 function tStats(t){let mn=1e9,mx=0;for(let k=0;k<t.h.length;k++){const v=t.h[k];if(v<mn)mn=v;if(v>mx)mx=v}t.emin=Math.round(mn);t.emax=Math.round(mx)}
-function tInitEdit(t,ed){
+function tInitEdit(t,ed,edv){
  t.h0=Float32Array.from(t.h);t.dl=new Float32Array(t.k*t.k);t.pd=null; t.rd=null; t.td=null; t.ed=ed||'';
  t.locks = new Uint8Array(t.k * t.k);
  t.deadRocks = new Uint8Array(t.k * t.k);
@@ -479,7 +479,7 @@ function tInitEdit(t,ed){
  if(G && G.map.deadRocks) G.map.deadRocks.forEach(k => t.deadRocks[k] = 1);
  if(G && G.map.deadTrees) G.map.deadTrees.forEach(k => t.deadTrees[k] = 1);
 
- if(ed){const d=edDec(ed,t.k*t.k);if(d){for(let k=0;k<d.length;k++){const e=Math.max(ED_MIN_E,Math.min(ED_MAX_E,t.h0[k]+d[k]));t.dl[k]=e-t.h0[k];t.h[k]=e}tReclass(t,0,0,t.k-1,t.k-1);tStats(t)}else{t.ed='';toast('地形の編集データを読み込めなかったため、元の地形を表示します')}}
+ if(ed){const d=edDec(ed,t.k*t.k,edv);if(d){for(let k=0;k<d.length;k++){const e=Math.max(ED_MIN_E,Math.min(ED_MAX_E,t.h0[k]+d[k]));t.dl[k]=e-t.h0[k];t.h[k]=e}tReclass(t,0,0,t.k-1,t.k-1);tStats(t)}else{t.ed='';toast('地形の編集データを読み込めなかったため、元の地形を表示します')}}
 
  if(G && G.works) {
   const activeWorks = G.works.filter(w => w.state === "施工中" && w.patch);
@@ -640,8 +640,26 @@ function pushSnapshot() {
   EM.redo = [];
   emRefresh();
 }
+function emCapturePersistState(){
+  return {
+    funds:G.funds,
+    history:Array.isArray(G.history)?G.history.slice():G.history,
+    map:{...G.map},
+    savedAt:G.savedAt,
+    ui:G.ui
+  };
+}
+function emRestorePersistState(t,state){
+  G.funds=state.funds;
+  G.history=state.history;
+  G.map=state.map;
+  G.savedAt=state.savedAt;
+  G.ui=state.ui;
+  t.ed=G.map.ed||'';
+}
 function emRestoreSnapshot(t, snap, isRedo) {
   if (snap.type === 'commit') {
+    const before=emCapturePersistState();
     const fwd = isRedo;
     if (fwd) {
       if (G.funds < snap.cost) {
@@ -654,7 +672,7 @@ function emRestoreSnapshot(t, snap, isRedo) {
         id: snap.histId,
         name: snap.name || "造成工事",
         area: snap.area || 0, vol: snap.vol || 0, rockArea: snap.rockArea || 0, treeArea: snap.treeArea || 0,
-        cost: snap.cost, startDate: G.date, endDate: G.date, state: "完了"
+        cost: snap.cost, startDate: snap.startDate || G.date, endDate: snap.endDate || snap.startDate || G.date, state: "完了"
       };
       if (!G.history) G.history = [];
       G.history.push(histItem);
@@ -665,7 +683,15 @@ function emRestoreSnapshot(t, snap, isRedo) {
         G.history = G.history.filter(h => h.id !== snap.histId);
       }
     }
-    emSave(t); saveGame(true);
+    emSave(t);
+    if(!saveGame(true)){
+      tApplyPatch(t,snap.pt,!fwd);
+      emRestorePersistState(t,before);
+      mvEditRefresh(t,snap.pt.bb,true);
+      upd();
+      toast("保存に失敗したため、Undo/Redoを取り消しました");
+      return false;
+    }
     mvEditRefresh(t, snap.pt.bb, true);
     upd();
     return true;
@@ -703,8 +729,8 @@ function emUndo(){
   const snap = EM.stack.pop();
   if (snap.type === 'commit') {
     if(EM.pb) emCancel();
-    emRestoreSnapshot(t, snap, false);
-    EM.redo.push(snap);
+    if(emRestoreSnapshot(t, snap, false)) EM.redo.push(snap);
+    else EM.stack.push(snap);
   } else {
     const currentSnap = emSaveSnapshot();
     if(currentSnap) EM.redo.push(currentSnap);
@@ -736,7 +762,7 @@ function emMove(e,P,dx,dy){if(EM.on&&EM.mode==='region')return emRMove(e,P);if(!
 function emUp(e,P){if(EM.on&&EM.mode==='region'){emRUp(e,P);return}if(EM.stroking&&P.size<=1){EM.stroking=false;EM.last=null;emRefresh()}}
 function emHover(e){if(EM.on&&EM.mode==='region'){emRHover(e);return}if(!EM.on||EM.tool==='view'||!MV.t)return;const p=mvPick(e.clientX,e.clientY);EM.pick=p;emRingUpdate(p)}
 function emSave(t){
- G.map.ed=edEnc(t.dl);G.map.tv=TV;if(!G.map.ed)delete G.map.ed;t.ed=G.map.ed||'';
+ G.map.ed=edEnc(t.dl);G.map.edv=2;G.map.tv=TV;if(!G.map.ed)delete G.map.ed;t.ed=G.map.ed||'';
  if(t.deadRocks){
   const dr=[];for(let k=0;k<t.deadRocks.length;k++)if(t.deadRocks[k])dr.push(k);
   if(dr.length>0)G.map.deadRocks=dr;else delete G.map.deadRocks;
@@ -784,6 +810,13 @@ function emCalcCost(t, bb) {
  return {n, mx, area, digVol, fillVol, rockArea, treeArea, cost};
 }
 
+let EM_WORK_SEQ=0;
+function emNewWorkId(){
+ const used=new Set([...(G.history||[]),...(G.works||[])].map(x=>x&&x.id).filter(Boolean));
+ let id;
+ do{id="W_"+Date.now().toString(36)+"_"+(++EM_WORK_SEQ).toString(36)+"_"+Math.random().toString(36).slice(2,10)}while(used.has(id));
+ return id;
+}
 function emCommit(){
  EM.pvOn=false;const t=MV.t;if(!t||!EM.pb)return;
  const stat = emCalcCost(t, EM.pb);
@@ -793,11 +826,14 @@ function emCommit(){
  const pt=tCommitPreview(t,EM.pb), bb=EM.pb; EM.pb=null;
  if(!pt){ mvEditRefresh(t,bb,false);emRefresh();return; }
  
+ const before=emCapturePersistState();
  const commitSnap = {
    type: 'commit',
    pt: pt,
    cost: stat.cost,
-   histId: "W_" + Date.now(),
+   histId: emNewWorkId(),
+   startDate: G.date,
+   endDate: G.date,
    name: EM.mode === 'region' ? (EM.op==='clear'?"障害物除去(区画)":"造成工事(区画)") : (EM.tool==='clear'?"障害物除去(ブラシ)":"造成工事(ブラシ)"),
    area: stat.area,
    vol: stat.digVol + stat.fillVol,
@@ -812,10 +848,18 @@ function emCommit(){
   id: commitSnap.histId,
   name: commitSnap.name,
   area: commitSnap.area, vol: commitSnap.vol, rockArea: commitSnap.rockArea, treeArea: commitSnap.treeArea,
-  cost: commitSnap.cost, startDate: G.date, endDate: G.date, state: "完了"
+  cost: commitSnap.cost, startDate: commitSnap.startDate, endDate: commitSnap.endDate, state: "完了"
  });
  
- emSave(t); saveGame(true);
+ emSave(t);
+ if(!saveGame(true)){
+  tApplyPatch(t,pt,false);
+  emRestorePersistState(t,before);
+  mvEditRefresh(t,bb,true);
+  emRefresh();upd();
+  toast("保存に失敗したため、工事確定を取り消しました");
+  return;
+ }
  
  EM.stack.push(commitSnap);
  if(EM.stack.length > 30) EM.stack.shift();
