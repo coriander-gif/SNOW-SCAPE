@@ -618,7 +618,7 @@ function normalizeCourseNodes(list){
  }
  for(const [node,entry] of nodes)if(entry.count<2)bad.add(node);
  for(const c of list)if(c&&typeof c==='object')for(const side of ['A','B'])if(bad.has(c['node'+side]))delete c['node'+side];
- return !bad.size;
+ return true;
 }
 function courseData(){if(!G.map.courses)G.map.courses=[];return G.map.courses}
 function courseSample(points,t){
