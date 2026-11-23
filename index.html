@@ -399,7 +399,7 @@ function genTerrainV3(seed,style){
  let mn=1e9,mxe=0;for(let k=0;k<K*K;k++){mn=Math.min(mn,E[k]);mxe=Math.max(mxe,E[k])}
  const peakOut=peaks.map(p=>({id:p.id,kind:p.kind,x:p.x*S/2,z:p.z*S/2,elev:Math.round(esamp(p.x*S/2,p.z*S/2))}));
  ridges.forEach(r=>r.pts.forEach(p=>{p.e=Math.round(esamp(p.x,p.z))}));
- return{key:seed+'/'+style+'/'+TV,n:N,k:K,size:S,cs,base:BASE,rel:REL,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe),peaks:peakOut,ridges,valleys,flats:flats.map(f=>({x:f.x*S/2,z:f.z*S/2,r:f.r*S/2,elev:Math.round(esamp(f.x*S/2,f.z*S/2))})),cellDev:dev,cellMod:mod,cls:{q75,q88:qt(.88),q95:qt(.95),sg}}}
+ return{key:seed+'/'+style+'/'+TV3,tv:TV3,gen:3,n:N,k:K,size:S,cs,base:BASE,rel:REL,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe),peaks:peakOut,ridges,valleys,flats:flats.map(f=>({x:f.x*S/2,z:f.z*S/2,r:f.r*S/2,elev:Math.round(esamp(f.x*S/2,f.z*S/2))})),cellDev:dev,cellMod:mod,cls:{q75,q88:qt(.88),q95:qt(.95),sg}}}
 function genTerrainV4(seed,style){
  const N=256,K=N+1,S=2304,cs=S/N,HM=cs*10,PS=8,R=mulb(seed),tab=new Float32Array(1024);
  for(let i=0;i<1024;i++)tab[i]=R();
