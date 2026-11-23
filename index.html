@@ -717,11 +717,12 @@ function courseFinish(points){
  if(aJoin&&bJoin&&Math.hypot(clean[0][0]-clean[clean.length-1][0],clean[0][1]-clean[clean.length-1][1])<4){list.splice(0,list.length,...JSON.parse(before));toast('同じ接続点を始点と終点に指定できません');return}
  const id='C_'+Date.now().toString(36)+'_'+(++CS.seq).toString(36),c={id,name:'コース'+String(list.length+1).padStart(2,'0'),points:clean,width:CS.width};
  if(aJoin)c.nodeA=aJoin.node;if(bJoin)c.nodeB=bJoin.node;
- list.push(c);CS.selected=id;courseRemovePreview();CS.points=[];CS.endpointFirst=null;
+ list.push(c);CS.selected=id;
  if(!validCourseList(list)||!saveGame(true)){
   list.splice(0,list.length,...JSON.parse(before));CS.selected=previousSelected;
-  toast('接続データまたは保存に問題があるため、コース作成を取り消しました');return;
+  toast('接続データまたは保存に問題があるため、コース作成を取り消しました。描画内容は保持しています');return;
  }
+ courseRemovePreview();CS.points=[];CS.endpointFirst=null;
  mvCourseRefresh();courseRefreshPanel();
  toast(aJoin||bJoin?'既存コースに接続しました（途中接続は既存コースを分割）':'コースを作成しました');
 }
