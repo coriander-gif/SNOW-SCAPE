@@ -671,7 +671,9 @@ function emRestorePersistState(t,state){
  t.dl=new Float32Array(state.terrain.dl);t.deadRocks=new Uint8Array(state.terrain.deadRocks);t.deadTrees=new Uint8Array(state.terrain.deadTrees);
  for(let k=0;k<t.h.length;k++)t.h[k]=t.h0[k]+t.dl[k];
  t.pd=null;t.rd=null;t.td=null;t.ed=G.map.ed||'';
- EM.pb=null;EM.pvOn=false;EM.stroking=false;EM.last=null;
+ EM.pb=null;EM.pvOn=false;EM.stroking=false;EM.last=null;EM.drag=null;
+ EM.sel=null;EM.bd=null;EM.selN=0;EM.selBB=null;
+ EM.stack=EM.stack.filter(x=>x.type==='commit');EM.redo=EM.redo.filter(x=>x.type==='commit');
  tReclass(t,0,0,t.k-1,t.k-1);tStats(t);
 }
 function emApplyPreviewSnapshot(t,snap){
