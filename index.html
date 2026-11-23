@@ -139,7 +139,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.3.3</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.4.0</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -568,7 +568,7 @@ function layoutVars(){const h=$('.hd'),n=$('#nav'),s=document.documentElement.st
 function mapPage(){return '<div class="map m3 big" id="mapbox"></div>'}
 function seasonOf(d){return['冬','冬','早春','春','春','初夏','夏','夏','初秋','秋','晩秋','初冬'][+d.split('-')[1]-1]}
 
-/* ===== v0.3.3 地形編集・造成工事システム ===== */
+/* ===== v0.4.0 地形編集・造成工事システム ===== */
 const ED_MAX=800,ED_MIN_E=400,ED_MAX_E=3400,ED_TALUS=1.5;
 function edEnc(dl){const n=dl.length,u=new Int16Array(n);let any=false;for(let i=0;i<n;i++){const v=Math.max(-ED_MAX*10,Math.min(ED_MAX*10,Math.round(dl[i]*10)));u[i]=v;if(v)any=true}if(!any)return '';const b=new Uint8Array(u.buffer);let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s)}
 function edDec(str,n,version){try{const s=atob(str);if(s.length!==n*2)return null;const b=new Uint8Array(n*2);for(let i=0;i<b.length;i++)b[i]=s.charCodeAt(i);const u=new Int16Array(b.buffer),o=new Float32Array(n),scale=version===2?10:1;for(let i=0;i<n;i++)o[i]=Math.max(-ED_MAX,Math.min(ED_MAX,u[i]/scale));return o}catch(e){return null}}
@@ -1107,7 +1107,7 @@ document.addEventListener("click",ev=>{
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.3.3</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.4.0</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
