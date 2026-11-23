@@ -541,7 +541,7 @@ function mvBind(cv){
   pd=pdist();pc=pcenter();
   const tv=EM.mode==='region'?EM.rtool:EM.tool;
   cv.style.cursor=CS.on?'crosshair':(EM.on&&tv!=='view'?'crosshair':'grabbing');
-  if(CS.on)courseDown(e,P);else emDown(e,P);
+  if(CS.on){if(P.size>1&&CS.pointerId!==null)courseCancelGesture(CS.pointerId);else courseDown(e,P)}else emDown(e,P);
  });
  cv.addEventListener('pointermove',e=>{
   const o=P.get(e.pointerId);if(!o){emHover(e);return}
@@ -565,7 +565,12 @@ function mvBind(cv){
   pd=pdist();pc=pcenter();
   if(!P.size){const tv=EM.mode==='region'?EM.rtool:EM.tool;cv.style.cursor=CS.on?'crosshair':(EM.on&&tv!=='view'?'crosshair':'grab');}
  };
- cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+ const cancel=e=>{
+  if(CS.on)courseCancelGesture(e.pointerId);else emUp(e,P);
+  P.delete(e.pointerId);pd=pdist();pc=pcenter();
+  if(!P.size){const tv=EM.mode==='region'?EM.rtool:EM.tool;cv.style.cursor=CS.on?'crosshair':(EM.on&&tv!=='view'?'crosshair':'grab');}
+ };
+ cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',cancel);
  cv.addEventListener('wheel',e=>{e.preventDefault();mvZoom(Math.exp((e.deltaMode===1?e.deltaY*33:e.deltaY)*.0012))},{passive:false});
  cv.addEventListener('webglcontextlost',e=>e.preventDefault());
  cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}});
@@ -581,7 +586,7 @@ const COURSE_COLORS={初級:0x32b86b,中級:0x3488e8,上級:0xe34b4b,最上級:0
 function validCourseList(a){
  if(a===undefined)return true;
  if(!Array.isArray(a)||a.length>100)return false;
- return a.every(c=>c&&typeof c==='object'&&typeof c.id==='string'&&c.id.length<=80&&typeof c.name==='string'&&c.name.length<=60&&Array.isArray(c.points)&&c.points.length>=2&&c.points.length<=2000&&c.points.every(p=>Array.isArray(p)&&p.length===2&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<=1200&&Math.abs(p[1])<=1200)&&Number.isFinite(c.width)&&c.width>=10&&c.width<=150);
+ return a.every(c=>c&&typeof c==='object'&&typeof c.id==='string'&&c.id.length<=80&&typeof c.name==='string'&&c.name.length<=60&&Array.isArray(c.points)&&c.points.length>=2&&c.points.length<=2000&&c.points.every(p=>Array.isArray(p)&&p.length===2&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<=1200&&Math.abs(p[1])<=1200)&&Number.isFinite(c.width)&&c.width>=10&&c.width<=150&&(c.nodeA===undefined||typeof c.nodeA==='string'&&c.nodeA.length<=80)&&(c.nodeB===undefined||typeof c.nodeB==='string'&&c.nodeB.length<=80));
 }
 function courseData(){if(!G.map.courses)G.map.courses=[];return G.map.courses}
 function courseSample(points,t){
@@ -592,14 +597,25 @@ function courseSample(points,t){
 function courseMetrics(points,t){
  const p=courseSample(points,t);let len=0,horiz=0,vert=0,maxSlope=0;
  for(let i=1;i<p.length;i++){const dx=p[i][0]-p[i-1][0],dz=p[i][1]-p[i-1][1],dh=tSample(t,p[i][0],p[i][1])-tSample(t,p[i-1][0],p[i-1][1]),h=Math.hypot(dx,dz);horiz+=h;vert+=Math.abs(dh);len+=Math.hypot(h,dh);if(h>0)maxSlope=Math.max(maxSlope,Math.atan(Math.abs(dh)/h)*180/Math.PI)}
- const avgSlope=horiz?Math.atan(vert/horiz)*180/Math.PI:0,difficulty=avgSlope<10?'初級':avgSlope<18?'中級':avgSlope<27?'上級':'最上級';
+ const avgSlope=horiz?Math.atan(vert/horiz)*180/Math.PI:0;
+ const grade=Math.max(avgSlope,maxSlope*.65);
+ const difficulty=grade<10?'初級':grade<18?'中級':grade<27?'上級':'最上級';
  return{points:p,length:len,avgSlope,maxSlope,difficulty};
 }
 function courseMakeGeometry(c,t){
  const m=courseMetrics(c.points,t),p=m.points;if(p.length<2)return null;const pos=[],idx=[],half=c.width/2;
- for(let i=0;i<p.length;i++){const a=p[Math.max(0,i-1)],b=p[Math.min(p.length-1,i+1)],dx=b[0]-a[0],dz=b[1]-a[1],L=Math.hypot(dx,dz)||1,nx=-dz/L,nz=dx/L;
-  for(const side of [-1,1]){const x=p[i][0]+nx*half*side,z=p[i][1]+nz*half*side,y=yOf(t,tSample(t,x,z))+.25;pos.push(x,y,z)}
-  if(i<p.length-1){const k=i*2;idx.push(k,k+1,k+2,k+1,k+3,k+2)}}
+ for(let i=0;i<p.length;i++){
+  const a=p[Math.max(0,i-1)],b=p[i],d=p[Math.min(p.length-1,i+1)];
+  const n1x=-(b[1]-a[1]),n1z=b[0]-a[0],l1=Math.hypot(n1x,n1z)||1;
+  const n2x=-(d[1]-b[1]),n2z=d[0]-b[0],l2=Math.hypot(n2x,n2z)||1;
+  let nx=n1x/l1+n2x/l2,nz=n1z/l1+n2z/l2,nl=Math.hypot(nx,nz);
+  if(nl<.001){nx=n2x/l2;nz=n2z/l2;nl=1}
+  nx/=nl;nz/=nl;
+  const dot=Math.max(.4,Math.abs(nx*(n2x/l2)+nz*(n2z/l2)));
+  const offset=Math.min(half*2.5,half/dot);
+  for(const side of [-1,1]){const x=b[0]+nx*offset*side,z=b[1]+nz*offset*side,y=yOf(t,tSample(t,x,z))+.25;pos.push(x,y,z)}
+  if(i<p.length-1){const k=i*2;idx.push(k,k+1,k+2,k+1,k+3,k+2)}
+ }
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return{geometry:g,metrics:m};
 }
 function mvCourseRefresh(){
@@ -618,9 +634,18 @@ function courseFinish(points){
  const clean=[points[0]];for(let i=1;i<points.length;i++)if(Math.hypot(points[i][0]-clean[clean.length-1][0],points[i][1]-clean[clean.length-1][1])>=4)clean.push(points[i]);
  if(clean.length<2||courseMetrics(clean,t).length<30){toast('コースが短すぎます。もう少し長く描いてください');return}
  const list=courseData();if(list.length>=100){toast('コースは最大100本までです');return}
- const id='C_'+Date.now().toString(36)+'_'+(++CS.seq).toString(36),c={id,name:'コース'+String(list.length+1).padStart(2,'0'),points:clean,width:CS.width};list.push(c);CS.selected=id;courseRemovePreview();CS.points=[];CS.endpointFirst=null;
- if(!saveGame(true)){list.pop();CS.selected=null;toast('保存に失敗したためコースを追加できませんでした');return}
- mvCourseRefresh();courseRefreshPanel();toast('コースを作成しました');
+ const oldNodes=list.map(c=>({c,nodeA:c.nodeA,nodeB:c.nodeB})),snapRadius=18;
+ const findJoin=p=>{let best=null,dist=snapRadius;for(const c of list){for(const side of ['A','B']){const q=c.points[side==='A'?0:c.points.length-1],d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<dist){dist=d;best={c,side,p:q}}}}return best};
+ const ja=findJoin(clean[0]),jb=findJoin(clean[clean.length-1]);
+ if(ja)clean[0]=[ja.p[0],ja.p[1]];if(jb)clean[clean.length-1]=[jb.p[0],jb.p[1]];
+ if(ja&&jb&&Math.hypot(clean[0][0]-clean[clean.length-1][0],clean[0][1]-clean[clean.length-1][1])<4){toast('同じ接続点を始点と終点に指定できません');return}
+ const nodeFor=join=>{if(!join)return null;const key=join.side==='A'?'nodeA':'nodeB';if(!join.c[key])join.c[key]='N_'+Date.now().toString(36)+'_'+(++CS.seq).toString(36);return join.c[key]};
+ const nodeA=nodeFor(ja),nodeB=nodeFor(jb);
+ const id='C_'+Date.now().toString(36)+'_'+(++CS.seq).toString(36),c={id,name:'コース'+String(list.length+1).padStart(2,'0'),points:clean,width:CS.width};
+ if(nodeA)c.nodeA=nodeA;if(nodeB)c.nodeB=nodeB;
+ list.push(c);const previousSelected=CS.selected;CS.selected=id;courseRemovePreview();CS.points=[];CS.endpointFirst=null;
+ if(!saveGame(true)){list.pop();for(const x of oldNodes){if(x.nodeA===undefined)delete x.c.nodeA;else x.c.nodeA=x.nodeA;if(x.nodeB===undefined)delete x.c.nodeB;else x.c.nodeB=x.nodeB}CS.selected=previousSelected;toast('保存に失敗したためコースを追加できませんでした');return}
+ mvCourseRefresh();courseRefreshPanel();toast(ja||jb?'既存コースに接続して作成しました':'コースを作成しました');
 }
 function courseToggle(){
  if(EM.on){toast('先に地形造成を終了してください');return}
@@ -631,12 +656,16 @@ function courseToggle(){
 function coursePanel(){
  const list=courseData(),selected=list.find(c=>c.id===CS.selected),w=selected?selected.width:CS.width;
  let rows='';for(const c of list){const m=courseMetrics(c.points,MV.t),co=(COURSE_COLORS[m.difficulty]||0x32b86b).toString(16).padStart(6,'0');rows+='<div class="csitem"><i class="csdot" style="background:#'+co+'"></i><button class="btn csname '+(CS.selected===c.id?'on':'')+'" data-cs="select" data-id="'+E(c.id)+'">'+E(c.name)+'・'+m.difficulty+'</button><button class="btn" data-cs="delete" data-id="'+E(c.id)+'">削除</button></div>'}
- return '<div class="cspanel" id="cspanel"><b>スキーコース建設</b><div class="seg"><button class="btn '+(CS.mode==='free'?'on':'')+'" data-cs="mode" data-v="free">自由描画</button><button class="btn '+(CS.mode==='ends'?'on':'')+'" data-cs="mode" data-v="ends">始点・終点指定</button></div><p class="emn">'+(CS.mode==='free'?'マップ上を1本指でなぞってコースを描きます。':'始点をタップし、続けて終点をタップします。')+'</p><label class="emr"><span>コース幅 <b id="cs-width-label">'+Math.round(w)+' m</b></span><input id="cs-width" type="range" min="10" max="100" step="5" value="'+w+'"></label><div class="seg"><button class="btn" data-cs="cancel">描画キャンセル</button></div><div><b style="font-size:12px">作成済みコース ('+list.length+')</b><div class="cslist">'+(rows||'<p class="emn">まだコースはありません。</p>')+'</div></div><p class="emn">完成したコースは幅のある帯として表示します。難易度は地形の傾斜から自動判定します。</p><button class="btn" data-cs="close">コース建設を終了</button></div>';
+ return '<div class="cspanel" id="cspanel"><b>スキーコース建設</b><div class="seg"><button class="btn '+(CS.mode==='free'?'on':'')+'" data-cs="mode" data-v="free">自由描画</button><button class="btn '+(CS.mode==='ends'?'on':'')+'" data-cs="mode" data-v="ends">始点・終点指定</button></div><p class="emn">'+(CS.mode==='free'?'マップ上を1本指でなぞってコースを描きます。':'始点をタップし、続けて終点をタップします。')+' 既存コースの端点から18m以内で開始・終了すると自動接続します。</p><label class="emr"><span>コース幅 <b id="cs-width-label">'+Math.round(w)+' m</b></span><input id="cs-width" type="range" min="10" max="100" step="5" value="'+w+'"></label><div class="seg"><button class="btn" data-cs="cancel">描画キャンセル</button></div><div><b style="font-size:12px">作成済みコース ('+list.length+')</b><div class="cslist">'+(rows||'<p class="emn">まだコースはありません。</p>')+'</div></div><p class="emn">完成したコースは幅のある帯として表示します。難易度は地形の傾斜から自動判定します。</p><button class="btn" data-cs="close">コース建設を終了</button></div>';
 }
 function courseRefreshPanel(){const el=document.getElementById('cspanel');if(!el)return;const fresh=document.createElement('div');fresh.innerHTML=coursePanel();el.replaceWith(fresh.firstElementChild)}
 function courseDown(e,P){
  if(P.size!==1||(e.button!==undefined&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;
  CS.pointerId=e.pointerId;CS.down=[p.x,p.z];CS.downXY=[e.clientX,e.clientY];if(CS.mode==='free'){CS.points=[[p.x,p.z]];courseLinePreview()}
+}
+function courseCancelGesture(pointerId){
+ if(pointerId!==undefined&&CS.pointerId!==pointerId)return;
+ CS.pointerId=null;CS.down=null;CS.downXY=null;CS.points=[];courseRemovePreview();mvDraw();
 }
 function courseMove(e,P){
  if(CS.pointerId!==e.pointerId||P.size!==1)return false;const p=mvPick(e.clientX,e.clientY);if(!p)return true;
@@ -656,7 +685,12 @@ document.addEventListener('click',e=>{
  else if(a==='select'){CS.selected=id;const c=list.find(x=>x.id===id);if(c)CS.width=c.width;courseRefreshPanel()}
  else if(a==='delete'){const i=list.findIndex(x=>x.id===id);if(i>=0&&confirm('このコースを削除しますか？')){const old=list.splice(i,1)[0];if(!saveGame(true)){list.splice(i,0,old);toast('保存に失敗したため削除を取り消しました')}else{if(CS.selected===id)CS.selected=null;mvCourseRefresh();courseRefreshPanel()}}}
 });
-document.addEventListener('change',e=>{if(e.target.id==='cs-width'&&CS.on){if(!saveGame(true))toast('幅の変更を保存できませんでした')}});
+document.addEventListener('pointerdown',e=>{if(e.target&&e.target.id==='cs-width'&&CS.on){const c=courseData().find(x=>x.id===CS.selected);CS.widthOriginal=c?c.width:CS.width}});
+document.addEventListener('change',e=>{
+ if(e.target.id==='cs-width'&&CS.on){
+  if(!saveGame(true)){const c=courseData().find(x=>x.id===CS.selected);if(c)c.width=CS.widthOriginal;CS.width=c?c.width:CS.widthOriginal;e.target.value=CS.width;const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';mvCourseRefresh();toast('保存に失敗したため幅の変更を元に戻しました')}
+ }
+});
 document.addEventListener('input',e=>{
  if(e.target.id==='cs-width'&&CS.on){CS.width=+e.target.value;const c=courseData().find(x=>x.id===CS.selected);if(c){c.width=CS.width;const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';mvCourseRefresh()}else{const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m'}}
 });
