@@ -607,7 +607,7 @@ function courseMakeGeometry(c,t){
  for(let i=0;i<p.length;i++){
   const a=p[Math.max(0,i-1)],b=p[i],d=p[Math.min(p.length-1,i+1)];
   const n1x=-(b[1]-a[1]),n1z=b[0]-a[0],l1=Math.hypot(n1x,n1z)||1;
-  const n2x=-(d[1]-b[1]),n2z=d[0]-b[0],l2=Math.hypot(n2x,n2z)||1;
+  const n2x=i===p.length-1?n1x:-(d[1]-b[1]),n2z=i===p.length-1?n1z:d[0]-b[0],l2=Math.hypot(n2x,n2z)||1;
   let nx=n1x/l1+n2x/l2,nz=n1z/l1+n2z/l2,nl=Math.hypot(nx,nz);
   if(nl<.001){nx=n2x/l2;nz=n2z/l2;nl=1}
   nx/=nl;nz/=nl;
@@ -685,7 +685,9 @@ document.addEventListener('click',e=>{
  else if(a==='select'){CS.selected=id;const c=list.find(x=>x.id===id);if(c)CS.width=c.width;courseRefreshPanel()}
  else if(a==='delete'){const i=list.findIndex(x=>x.id===id);if(i>=0&&confirm('このコースを削除しますか？')){const old=list.splice(i,1)[0];if(!saveGame(true)){list.splice(i,0,old);toast('保存に失敗したため削除を取り消しました')}else{if(CS.selected===id)CS.selected=null;mvCourseRefresh();courseRefreshPanel()}}}
 });
-document.addEventListener('pointerdown',e=>{if(e.target&&e.target.id==='cs-width'&&CS.on){const c=courseData().find(x=>x.id===CS.selected);CS.widthOriginal=c?c.width:CS.width}});
+function courseRememberWidth(){const c=courseData().find(x=>x.id===CS.selected);CS.widthOriginal=c?c.width:CS.width}
+document.addEventListener('pointerdown',e=>{if(e.target&&e.target.id==='cs-width'&&CS.on)courseRememberWidth()});
+document.addEventListener('focusin',e=>{if(e.target&&e.target.id==='cs-width'&&CS.on)courseRememberWidth()});
 document.addEventListener('change',e=>{
  if(e.target.id==='cs-width'&&CS.on){
   if(!saveGame(true)){const c=courseData().find(x=>x.id===CS.selected);if(c)c.width=CS.widthOriginal;CS.width=c?c.width:CS.widthOriginal;e.target.value=CS.width;const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';mvCourseRefresh();toast('保存に失敗したため幅の変更を元に戻しました')}
