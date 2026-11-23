@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.3.3</title>
+<title>SNOWSCAPE v0.4.0</title>
 <style>
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101C29;--card:#1B2B3B;--main:#56B8E5;--acc:#8DD8F5;--tx:#F1F6FA;--sub:#A0B2C1;--bd:#34485A;--on:#0B1A26;color-scheme:dark}}
@@ -139,7 +139,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.3.3</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.4.0</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -225,8 +225,31 @@ function fmtDate(s){const d=new Date(s+"T00:00:00Z");return d.getUTCFullYear()+"
 /* ---- save / load ---- */
 function realDate(s){if(typeof s!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+"T00:00:00Z");return !isNaN(d)&&d.toISOString().slice(0,10)===s}
 const has=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
-function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&typeof o.mountain==="string"&&o.mountain!==""&&o.mountain.length<=40&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100}
-function saveGame(quiet){if(!G)return;G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};const ok=lsSet(SK,JSON.stringify(G));if(!ok)toast("セーブに失敗しました(ブラウザの保存領域を確認してください)");else if(!quiet)toast("セーブしました");refreshTitle();return ok}
+function validWorkList(a){
+ if(a===undefined)return true;
+ if(!Array.isArray(a)||a.length>10000)return false;
+ return a.every(w=>!!w&&typeof w==="object"&&!Array.isArray(w)&&
+  (w.id===undefined||(typeof w.id==="string"&&w.id.length<=128))&&
+  (w.name===undefined||(typeof w.name==="string"&&w.name.length<=120))&&
+  (w.cost===undefined||(Number.isFinite(w.cost)&&w.cost>=0))&&
+  (w.startDate===undefined||realDate(w.startDate))&&
+  (w.endDate===undefined||realDate(w.endDate)));
+}
+function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&typeof o.mountain==="string"&&o.mountain!==""&&o.mountain.length<=40&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100&&validWorkList(o.history)&&validWorkList(o.works)}
+function saveGame(quiet){
+ if(!G)return false;
+ let ok=false;
+ try{
+  G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};
+  const payload=JSON.stringify(G);ok=lsSet(SK,payload);
+ }catch(e){
+  toast("セーブデータの作成に失敗しました");return false;
+ }
+ if(!ok)toast("セーブに失敗しました(ブラウザの保存領域を確認してください)");
+ else if(!quiet)toast("セーブしました");
+ try{refreshTitle()}catch(e){console.error("Title save indicator update failed",e)}
+ return ok;
+}
 function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}if(o.wx&&typeof o.wx==="object"){if(Number.isFinite(o.wx.depth))o.wx.depth=Math.min(1000,o.wx.depth);if(Number.isFinite(o.wx.dd))o.wx.dd=Math.max(-1000,Math.min(1000,o.wx.dd))}
 if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);
 if(!o.works) o.works = []; if(!o.history) o.history = [];
@@ -295,10 +318,10 @@ const STJ={broad:'広がりのある山体',chain:'連なる峰',steep:'急峻�
 const STY={broad:['ニセコ・羊蹄山周辺','ルスツ周辺','大雪山周辺','八幡平周辺','磐梯山周辺','御嶽山周辺','乗鞍岳周辺','大山周辺'],chain:['蔵王連峰','富良野周辺','八甲田山周辺','白山山麓','氷ノ山周辺','石鎚山周辺','恐羅漢山周辺','九重連山周辺'],steep:['白馬山麓','谷川岳周辺','立山山麓','妙高山周辺','武尊山周辺','苗場山周辺','奥越・荒島岳周辺','鷲ヶ岳周辺'],plateau:['志賀高原','安比高原周辺','丸沼高原周辺','野沢温泉周辺','手稲山周辺','奥伊吹・伊吹山周辺']};
 const mulb=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
 const hstr=s=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0};
-function initMap(g){const s=hstr(g.mountain),ks=Object.keys(STY);let st=ks[s%ks.length];for(const k of ks)if(STY[k].includes(g.mountain))st=k;return{v:MAP_V,seed:s,style:st,owned:[]}}
-function validMap(m){return !!m&&typeof m==='object'&&m.v===MAP_V&&Number.isInteger(m.seed)&&has(STY,m.style)&&Array.isArray(m.owned)&&m.owned.every(x=>typeof x==='string')&&(m.ed===undefined||(typeof m.ed==='string'&&m.ed.length<=64000))&&(m.tv===undefined||typeof m.tv==='string')}
-const TV='v3';
-function genTerrain(seed,style){
+function initMap(g){const s=hstr(g.mountain),ks=Object.keys(STY);let st=ks[s%ks.length];for(const k of ks)if(STY[k].includes(g.mountain))st=k;return{v:MAP_V,seed:s,style:st,gen:4,owned:[]}}
+function validMap(m){return !!m&&typeof m==='object'&&m.v===MAP_V&&(m.gen===undefined||m.gen===3||m.gen===4)&&Number.isInteger(m.seed)&&has(STY,m.style)&&Array.isArray(m.owned)&&m.owned.every(x=>typeof x==='string')&&(m.ed===undefined||(typeof m.ed==='string'&&m.ed.length<=200000))&&(m.edv===undefined||(Number.isInteger(m.edv)&&m.edv>=1&&m.edv<=2))&&(m.tv===undefined||typeof m.tv==='string')}
+const TV3='v3',TV4='v4';
+function genTerrainV3(seed,style){
  const N=128,K=N+1,S=1152,cs=S/N,HM=cs*10,PS=8,R=mulb(seed),tab=new Float32Array(1024);
  for(let i=0;i<1024;i++)tab[i]=R();
  const sm=a=>{a=Math.max(0,Math.min(1,a));return a*a*(3-2*a)};
@@ -376,10 +399,89 @@ function genTerrain(seed,style){
  let mn=1e9,mxe=0;for(let k=0;k<K*K;k++){mn=Math.min(mn,E[k]);mxe=Math.max(mxe,E[k])}
  const peakOut=peaks.map(p=>({id:p.id,kind:p.kind,x:p.x*S/2,z:p.z*S/2,elev:Math.round(esamp(p.x*S/2,p.z*S/2))}));
  ridges.forEach(r=>r.pts.forEach(p=>{p.e=Math.round(esamp(p.x,p.z))}));
- return{key:seed+'/'+style+'/'+TV,n:N,k:K,size:S,cs,base:BASE,rel:REL,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe),peaks:peakOut,ridges,valleys,flats:flats.map(f=>({x:f.x*S/2,z:f.z*S/2,r:f.r*S/2,elev:Math.round(esamp(f.x*S/2,f.z*S/2))})),cellDev:dev,cellMod:mod,cls:{q75,q88:qt(.88),q95:qt(.95),sg}}}
+ return{key:seed+'/'+style+'/'+TV3,tv:TV3,gen:3,n:N,k:K,size:S,cs,base:BASE,rel:REL,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe),peaks:peakOut,ridges,valleys,flats:flats.map(f=>({x:f.x*S/2,z:f.z*S/2,r:f.r*S/2,elev:Math.round(esamp(f.x*S/2,f.z*S/2))})),cellDev:dev,cellMod:mod,cls:{q75,q88:qt(.88),q95:qt(.95),sg}}}
+function genTerrainV4(seed,style){
+ const N=256,K=N+1,S=2304,cs=S/N,HM=cs*10,PS=8,R=mulb(seed),tab=new Float32Array(1024);
+ for(let i=0;i<1024;i++)tab[i]=R();
+ const sm=a=>{a=Math.max(0,Math.min(1,a));return a*a*(3-2*a)};
+ const vn=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),u=sm(x-xi),v=sm(y-yi),g=(a,b)=>tab[(a&31)*32+(b&31)];return(g(xi,yi)*(1-u)+g(xi+1,yi)*u)*(1-v)+(g(xi,yi+1)*(1-u)+g(xi+1,yi+1)*u)*v};
+ const fbm=(x,y)=>{let a=.5,f=1,s=0;for(let o=0;o<4;o++){s+=a*vn(x*f+o*7.3,y*f+o*3.1);a*=.5;f*=2}return s/.9375};
+ const rid=(x,y)=>{let a=.5,f=1,s=0;for(let o=0;o<4;o++){s+=a*(1-Math.abs(2*vn(x*f+o*5.7,y*f+o*9.1)-1));a*=.5;f*=2}return s/.9375};
+ const REL={broad:2500,chain:2500,steep:2500,plateau:2500}[style]||2500,BASE=500;
+ const nP={broad:6+(R()*2|0),chain:8+(R()*2|0),steep:7+(R()*2|0),plateau:6+(R()*2|0)}[style]||7;
+ const pts=[],far=(x,z,md)=>pts.every(p=>Math.hypot(p[0]-x,p[1]-z)>=md);
+ const put=(cx,cz,rad,md)=>{for(let k=0;k<60;k++){const a=R()*6.283,r=rad*Math.sqrt(R()),x=cx+Math.cos(a)*r,z=cz+Math.sin(a)*r;if(Math.abs(x)<.8&&Math.abs(z)<.8&&far(x,z,md)){pts.push([x,z]);return true}}return false};
+ if(style==='chain'){const a0=R()*Math.PI,c=Math.cos(a0),s=Math.sin(a0),b=(R()-.5)*.6;for(let k=0;k<nP;k++){const t=-.76+1.52*(k+(R()-.5)*.5)/(nP-1),u=b*(t*t-.13);pts.push([c*t-s*u+(R()-.5)*.1,s*t+c*u+(R()-.5)*.1])}}
+ else if(style==='steep'){const c1=[-.3+R()*.15,-.2+R()*.3],c2=[.3-R()*.15,.2-R()*.3];for(let k=0;k<nP;k++){const c=k%2?c2:c1;if(!put(c[0],c[1],.38,.22))put(0,0,.75,.15)}}
+ else{put(R()*.24-.12,R()*.24-.12,.01,0);while(pts.length<nP){if(!put(0,0,style==='plateau'?.78:.74,style==='plateau'?.27:.3)&&!put(0,0,.78,.12))break}}
+ const np=pts.length,hs=[1,.74+R()*.08];while(hs.length<np)hs.push(.38+R()*.3);
+ if(style!=='broad')for(let i=hs.length-1;i>0;i--){const j=R()*(i+1)|0,t=hs[i];hs[i]=hs[j];hs[j]=t}
+ const sc=1;
+ const peaks=pts.map((p,i)=>({id:'K'+(i+1),x:p[0],z:p[1],h:hs[i]*sc,r:.28+R()*.1,kind:hs[i]>=1?'main':hs[i]>=.7?'sub':'minor'}));
+ const ed=[],used=new Set([0]),dist=(a,b)=>Math.hypot(peaks[a].x-peaks[b].x,peaks[a].z-peaks[b].z);
+ while(used.size<np){let bd=1e9,ba=0,bb=0;for(const a of used)for(let b=0;b<np;b++)if(!used.has(b)&&dist(a,b)<bd){bd=dist(a,b);ba=a;bb=b}ed.push([ba,bb]);used.add(bb)}
+ for(let k=0;k<(style==='chain'?2:3);k++){let bd=1e9,ba=-1,bb=-1;for(let a=0;a<np;a++)for(let b=a+1;b<np;b++){if(ed.some(e=>(e[0]===a&&e[1]===b)||(e[0]===b&&e[1]===a)))continue;const d=dist(a,b);if(d<bd&&d<.7){bd=d;ba=a;bb=b}}if(ba>=0)ed.push([ba,bb])}
+ const rs=[],ridges=[];
+ for(const [a,b] of ed){const A=peaks[a],B=peaks[b],dx=B.x-A.x,dz=B.z-A.z,L=Math.hypot(dx,dz)||1,ox=-dz/L,oz=dx/L,w1=(R()-.5)*.22,w2=(R()-.5)*.09,ph=R()*6.28,fr=1+(R()*3|0),sad=.5+.25*R(),rw=(.12+R()*.08)*1.15,pp=[];
+  for(let i=0;i<=14;i++){const t=i/14,sn=Math.sin(Math.PI*t),o=w1*sn+w2*Math.sin(2*Math.PI*t),x=A.x+dx*t+ox*o,z=A.z+dz*t+oz*o,h=Math.max(.3,(A.h*(1-t)+B.h*t)*(1-(1-sad)*sn)*(.92+.08*Math.sin(t*6.28*fr+ph)));rs.push([x,z,h,rw*(.8+.4*Math.abs(Math.sin(t*3+ph)))]);pp.push({x:x*S/2,z:z*S/2})}
+  ridges.push({a:A.id,b:B.id,pts:pp})}
+ const flats=[];for(let k=0;k<3;k++){for(let t=0;t<40;t++){const a=R()*6.283,rr=.58+R()*.22,x=Math.cos(a)*rr,z=Math.sin(a)*rr;if(Math.abs(x)<.82&&Math.abs(z)<.82&&flats.every(f=>Math.hypot(f.x-x,f.z-z)>.5)&&peaks.every(p=>Math.hypot(p.x-x,p.z-z)>.3)){flats.push({x,z,r:.11+R()*.04,l:.1});break}}}
+ const H=new Float32Array(K*K),NA={broad:.1,chain:.1,steep:.14,plateau:.12}[style]||.1;let mx=0;
+ for(let j=0;j<K;j++)for(let i=0;i<K;i++){
+  const x=(i/N-.5)*2,z=(j/N-.5)*2;let h=.1*Math.exp(-(x*x+z*z)/1.2);
+  for(const p of peaks){const d2=(x-p.x)**2+(z-p.z)**2,r2=p.r*p.r;if(d2<9*r2)h=Math.max(h,p.h*Math.exp(-Math.pow(d2/r2,1.25)))}
+  for(const q of rs){const d2=(x-q[0])**2+(z-q[1])**2,r2=q[3]*q[3];if(d2<9*r2)h=Math.max(h,q[2]*Math.exp(-d2/r2))}
+  if(style==='plateau')h=Math.max(h,.32*sm((.78-Math.hypot(x,z))/.3));
+  h+=NA*(fbm(x*2.4,z*2.4)-.5)*(.3+h);
+  h*=.85+.3*rid(x*2.2+3,z*2.2+5);
+  for(const f of flats){const d=Math.hypot(x-f.x,z-f.z);if(d<f.r*1.5){const w=sm(1-d/(f.r*1.5));h=h*(1-w)+(f.l+.012*(fbm(x*5,z*5)-.5))*w}}
+  if(h<.18){const k=1-h/.18;h=h*(1-.3*k)+.3*k*(.09+.04*fbm(x*3,z*3))}
+  h*=1-.7*sm((Math.max(Math.abs(x),Math.abs(z))-.86)/.14);
+  H[j*K+i]=Math.max(0,h);if(h>mx)mx=h}
+ for(let it=0;it<2;it++){const T=H.slice();for(let j=1;j<K-1;j++)for(let i=1;i<K-1;i++){const k=j*K+i;H[k]=(T[k]*4+T[k-1]*2+T[k+1]*2+T[k-K]*2+T[k+K]*2+T[k-K-1]+T[k-K+1]+T[k+K-1]+T[k+K+1])/16}}
+ mx=0;for(let k=0;k<K*K;k++)if(H[k]>mx)mx=H[k];
+ const E=new Float32Array(K*K);
+ for(let k=0;k<K*K;k++)E[k]=BASE+Math.pow(H[k]/mx,1.4)*REL;
+ const esamp=(x,z)=>{const fx=Math.max(0,Math.min(N-.001,(x+S/2)/cs)),fz=Math.max(0,Math.min(N-.001,(z+S/2)/cs)),i=fx|0,j=fz|0,u=fx-i,v=fz-j;return(E[j*K+i]*(1-u)+E[j*K+i+1]*u)*(1-v)+(E[(j+1)*K+i]*(1-u)+E[(j+1)*K+i+1]*u)*v};
+ const ce=new Float32Array(N*N),cn=new Float32Array(N*N),sl=new Float32Array(N*N),ty=new Uint8Array(N*N);
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=j*K+i,b=a+1,c=a+K,d=c+1,q=j*N+i;ce[q]=(E[a]+E[b]+E[c]+E[d])/4;cn[q]=(ce[q]-BASE)/REL;sl[q]=Math.hypot((E[b]+E[d]-E[a]-E[c])/(2*HM),(E[c]+E[d]-E[a]-E[b])/(2*HM))}
+ const sorted=Float32Array.from(sl).sort(),qt=f=>sorted[Math.floor(f*(N*N-1))],q75=qt(.75),q93=qt(.93);
+ const cvv=new Float32Array(N*N),tp=new Uint8Array(N*N),bt=new Uint8Array(N*N);let ss=0;
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const k=j*N+i,h=cn[k];let sum=0,c=0,top=1,bot=1;
+  for(let dj=-2;dj<=2;dj++)for(let di=-2;di<=2;di++){const jj=j+dj,ii=i+di;if(jj<0||ii<0||jj>=N||ii>=N||(!dj&&!di))continue;const v=cn[jj*N+ii];sum+=v;c++;if(v>h)top=0;if(v<h)bot=0}
+  cvv[k]=h-sum/c;tp[k]=top;bt[k]=bot;ss+=cvv[k]*cvv[k]}
+ const sg=Math.sqrt(ss/(N*N))||.01,valleys=[];
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const k=j*N+i,h=cn[k],s=sl[k],cv=cvv[k];let t;
+  if(tp[k]&&h>.5)t=5;
+  else if((s>Math.max(.55,qt(.95))&&h>.3)||(h>.65&&s>Math.max(.5,qt(.88))))t=3;
+  else if(s<.1&&h<.35)t=0;
+  else if(cv>.7*sg&&h>.18)t=6;
+  else if(cv<-.7*sg)t=7;
+  else if(h>.5&&s<.55)t=4;
+  else if(s>Math.min(.55,q75))t=2;
+  else if(s<.14&&h<.5)t=0;
+  else if(h<.62)t=1;
+  else t=4;
+  ty[k]=t;if(bt[k]&&t===7&&valleys.length<60)valleys.push({x:-S/2+(i+.5)*cs,z:-S/2+(j+.5)*cs,elev:Math.round(ce[k])})}
+ for(const p of peaks){const i=Math.min(N-1,Math.max(0,Math.floor((p.x+1)/2*N))),j=Math.min(N-1,Math.max(0,Math.floor((p.z+1)/2*N)));ty[j*N+i]=5}
+ const dev=new Uint8Array(N*N),mod=new Uint8Array(N*N);
+ for(let k=0;k<N*N;k++){const s=sl[k],t=ty[k];dev[k]=t===3?0:s<.15?3:s<.3?2:s<.55?1:0;if(t===5&&dev[k]>2)dev[k]=2;mod[k]=t===3?1:s>.55?2:0}
+ let trees=[],rocks=[];
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const t=ty[j*N+i];let n=t===1?(R()<.75?1:0)+(cn[j*N+i]<.3&&R()<.3?1:0):t===7?(R()<.25?1:0):t===0?(R()<.05?1:0):0;
+  for(let q=0;q<n;q++)trees.push({x:-S/2+(i+R())*cs,z:-S/2+(j+R())*cs,s:1.5+R()*1.2});
+  if(t===3&&R()<.5)rocks.push({x:-S/2+(i+R())*cs,z:-S/2+(j+R())*cs,s:2.4+R()*2.6})}
+ if(trees.length>4000){const pk=4000/trees.length;trees=trees.filter(()=>R()<pk)}if(rocks.length>8000){const pk=8000/rocks.length;rocks=rocks.filter(()=>R()<pk)}
+ const parcels=[],pn=N/PS,cnt=Array(8).fill(0);for(let k=0;k<N*N;k++)cnt[ty[k]]++;
+ for(let r=0;r<pn;r++)for(let c=0;c<pn;c++){const tc=Array(8).fill(0);let se=0,sq=0,sd=0,sx=0;
+  for(let j=0;j<PS;j++)for(let i=0;i<PS;i++){const k=(r*PS+j)*N+c*PS+i;tc[ty[k]]++;se+=ce[k];sq+=sl[k];sd+=dev[k];sx+=mod[k]>0?1:0}
+  const n2=PS*PS;parcels.push({id:'P'+String(r+1).padStart(2,'0')+'-'+String(c+1).padStart(2,'0'),r,c,type:tc.indexOf(Math.max(...tc)),elev:Math.round(se/n2),slope:Math.round(Math.atan(sq/n2)*1800/Math.PI)/10,suit:Math.round(sd/n2*10)/10,modCells:sx,price:null,owned:false,developable:null})}
+ let mn=1e9,mxe=0;for(let k=0;k<K*K;k++){mn=Math.min(mn,E[k]);mxe=Math.max(mxe,E[k])}
+ const peakOut=peaks.map(p=>({id:p.id,kind:p.kind,x:p.x*S/2,z:p.z*S/2,elev:Math.round(esamp(p.x*S/2,p.z*S/2))}));
+ ridges.forEach(r=>r.pts.forEach(p=>{p.e=Math.round(esamp(p.x,p.z))}));
+ return{key:seed+'/'+style+'/'+TV4,tv:TV4,gen:4,n:N,k:K,size:S,cs,base:BASE,rel:REL,h:E,cellType:ty,cellSlope:sl,cellElev:ce,trees,rocks,parcels,ps:PS,counts:cnt,emin:Math.round(mn),emax:Math.round(mxe),peaks:peakOut,ridges,valleys,flats:flats.map(f=>({x:f.x*S/2,z:f.z*S/2,r:f.r*S/2,elev:Math.round(esamp(f.x*S/2,f.z*S/2))})),cellDev:dev,cellMod:mod,cls:{q75,q88:qt(.88),q95:qt(.95),sg}}}
 function tSample(t,x,z){const fx=Math.max(0,Math.min(t.n-.001,(x+t.size/2)/t.cs)),fz=Math.max(0,Math.min(t.n-.001,(z+t.size/2)/t.cs)),i=Math.floor(fx),j=Math.floor(fz),u=fx-i,v=fz-j,K=t.k,h=t.h;return(h[j*K+i]*(1-u)+h[j*K+i+1]*u)*(1-v)+(h[(j+1)*K+i]*(1-u)+h[(j+1)*K+i+1]*u)*v}
 let TC=null;
-function getTerrain(g){if(!validMap(g.map))g.map=initMap(g);const k=g.map.seed+'/'+g.map.style+'/'+TV;const ed=(g.map.tv===TV&&g.map.ed)?g.map.ed:'';if(g.map.ed&&g.map.tv!==TV)toast('地形データのバージョンが異なるため、編集内容を適用できませんでした');if(!TC||TC.key!==k||TC.ed!==ed){TC=genTerrain(g.map.seed,g.map.style);tInitEdit(TC,ed);emReset()}return TC}
+function getTerrain(g){if(!validMap(g.map))g.map=initMap(g);const gen=g.map.gen===4?4:3,tv=gen===4?TV4:TV3,k=g.map.seed+'/'+g.map.style+'/'+tv,ed=(g.map.tv===tv&&g.map.ed)?g.map.ed:'';if(g.map.ed&&g.map.tv!==tv)toast('地形データのバージョンが異なるため、編集内容を適用できませんでした');if(!TC||TC.key!==k||TC.ed!==ed){TC=gen===4?genTerrainV4(g.map.seed,g.map.style):genTerrainV3(g.map.seed,g.map.style);TC.gen=gen;TC.tv=tv;tInitEdit(TC,ed,g.map.edv);emReset()}return TC}
 
 /* 描画 */
 const YS=.15,MV={ok:null,q:0,tx:0,tz:0,d:900,yaw:.6,pitch:.9,key:'',box:null};
@@ -389,8 +491,8 @@ function mvInit(){
  try{
   if(!window.THREE)throw new Error('Three.jsを読み込めませんでした(ネットワークを確認してください)');
   const cv=document.createElement('canvas'),r=new THREE.WebGLRenderer({canvas:cv,antialias:true});
-  r.setClearColor(0xd6e9f4);MV.cv=cv;MV.r=r;MV.sc=new THREE.Scene();MV.sc.fog=new THREE.Fog(0xd6e9f4,2000,6500);
-  MV.cam=new THREE.PerspectiveCamera(40,1,3,9000);
+  r.setClearColor(0xd6e9f4);MV.cv=cv;MV.r=r;MV.sc=new THREE.Scene();MV.sc.fog=new THREE.Fog(0xd6e9f4,2500,13000);
+  MV.cam=new THREE.PerspectiveCamera(40,1,3,18000);
   MV.sc.add(new THREE.HemisphereLight(0xffffff,0x6d7f8f,.6));
   const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(-120,160,80);MV.sc.add(dl);
   mvBind(cv);MV.ok=true;
@@ -414,9 +516,9 @@ function mvColor(depth,rb){
  col.needsUpdate=true}
 function mvCam(){const c=MV.cam,t=MV.t,cp=Math.cos(MV.pitch),gy=t?yOf(t,tSample(t,MV.tx,MV.tz)):30,w=Math.max(0,Math.min(1,(700-MV.d)/600)),ly=(t?(t.emax-t.base)*YS*.22:30)*(1-w)+gy*w,cx=MV.tx+MV.d*cp*Math.sin(MV.yaw),cz=MV.tz+MV.d*cp*Math.cos(MV.yaw);let cy=ly+MV.d*Math.sin(MV.pitch);if(t)cy=Math.max(cy,yOf(t,tSample(t,cx,cz))+6);c.position.set(cx,cy,cz);c.lookAt(MV.tx,ly,MV.tz)}
 function mvDraw(){if(MV.q||!MV.ok||!MV.box||!MV.box.isConnected||MV.box.offsetParent===null)return;MV.q=requestAnimationFrame(()=>{MV.q=0;try{mvCam();MV.r.render(MV.sc,MV.cam)}catch(e){console.error(e)}})}
-function mvZoom(f){MV.d=Math.max(55,Math.min(2800,MV.d*f));mvDraw()}
+function mvZoom(f){MV.d=Math.max(55,Math.min(5600,MV.d*f));mvDraw()}
 function mvPan(dx,dy){const k=MV.d*.73/Math.max(300,MV.cv.clientHeight),s=Math.sin(MV.yaw),c=Math.cos(MV.yaw),lim=(MV.t?MV.t.size:240)*.45;MV.tx=Math.max(-lim,Math.min(lim,MV.tx-c*dx*k-s*dy*k*1.26));MV.tz=Math.max(-lim,Math.min(lim,MV.tz+s*dx*k-c*dy*k*1.26));mvDraw()}
-function mvFit(){const a=MV.cam?MV.cam.aspect:1.5,T=MV.t,hr=T?(T.emax-T.base)*YS/T.size:.19,z=(T?T.size:640)/640*900*(1+1.2*hr)/1.23;MV.d=Math.min(2800,z*Math.max(1,1.3/a))}
+function mvFit(){const a=MV.cam?MV.cam.aspect:1.5,T=MV.t,hr=T?(T.emax-T.base)*YS/T.size:.19,z=(T?T.size:640)/640*900*(1+1.2*hr)/1.23;MV.d=Math.min(5600,z*Math.max(1,1.3/a))}
 function mvReset(){MV.tx=0;MV.tz=0;MV.yaw=0.6;MV.pitch=0.9;mvFit();mvDraw()}
 function mvResize(){const b=MV.box;if(!b||!MV.r)return;const w=b.clientWidth,h=b.clientHeight;if(!w||!h)return;MV.r.setPixelRatio(Math.min(window.devicePixelRatio||1,2));MV.r.setSize(w,h,false);MV.cam.aspect=w/h;MV.cam.updateProjectionMatrix();mvDraw()}
 function mvTheme(){if(!MV.r)return;const c=document.documentElement.dataset.theme==='dark'?0x14283a:0xd6e9f4;MV.r.setClearColor(c);MV.sc.fog.color.setHex(c);mvDraw()}
@@ -466,12 +568,12 @@ function layoutVars(){const h=$('.hd'),n=$('#nav'),s=document.documentElement.st
 function mapPage(){return '<div class="map m3 big" id="mapbox"></div>'}
 function seasonOf(d){return['冬','冬','早春','春','春','初夏','夏','夏','初秋','秋','晩秋','初冬'][+d.split('-')[1]-1]}
 
-/* ===== v0.3.3 地形編集・造成工事システム ===== */
+/* ===== v0.4.0 地形編集・造成工事システム ===== */
 const ED_MAX=800,ED_MIN_E=400,ED_MAX_E=3400,ED_TALUS=1.5;
-function edEnc(dl){const n=dl.length,u=new Int16Array(n);let any=false;for(let i=0;i<n;i++){const v=Math.max(-ED_MAX,Math.min(ED_MAX,Math.round(dl[i])));u[i]=v;if(v)any=true}if(!any)return '';const b=new Uint8Array(u.buffer);let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s)}
-function edDec(str,n){try{const s=atob(str);if(s.length!==n*2)return null;const b=new Uint8Array(n*2);for(let i=0;i<b.length;i++)b[i]=s.charCodeAt(i);const u=new Int16Array(b.buffer),o=new Float32Array(n);for(let i=0;i<n;i++)o[i]=Math.max(-ED_MAX,Math.min(ED_MAX,u[i]));return o}catch(e){return null}}
+function edEnc(dl){const n=dl.length,u=new Int16Array(n);let any=false;for(let i=0;i<n;i++){const v=Math.max(-ED_MAX*10,Math.min(ED_MAX*10,Math.round(dl[i]*10)));u[i]=v;if(v)any=true}if(!any)return '';const b=new Uint8Array(u.buffer);let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s)}
+function edDec(str,n,version){try{const s=atob(str);if(s.length!==n*2)return null;const b=new Uint8Array(n*2);for(let i=0;i<b.length;i++)b[i]=s.charCodeAt(i);const u=new Int16Array(b.buffer),o=new Float32Array(n),scale=version===2?10:1;for(let i=0;i<n;i++)o[i]=Math.max(-ED_MAX,Math.min(ED_MAX,u[i]/scale));return o}catch(e){return null}}
 function tStats(t){let mn=1e9,mx=0;for(let k=0;k<t.h.length;k++){const v=t.h[k];if(v<mn)mn=v;if(v>mx)mx=v}t.emin=Math.round(mn);t.emax=Math.round(mx)}
-function tInitEdit(t,ed){
+function tInitEdit(t,ed,edv){
  t.h0=Float32Array.from(t.h);t.dl=new Float32Array(t.k*t.k);t.pd=null; t.rd=null; t.td=null; t.ed=ed||'';
  t.locks = new Uint8Array(t.k * t.k);
  t.deadRocks = new Uint8Array(t.k * t.k);
@@ -479,7 +581,7 @@ function tInitEdit(t,ed){
  if(G && G.map.deadRocks) G.map.deadRocks.forEach(k => t.deadRocks[k] = 1);
  if(G && G.map.deadTrees) G.map.deadTrees.forEach(k => t.deadTrees[k] = 1);
 
- if(ed){const d=edDec(ed,t.k*t.k);if(d){for(let k=0;k<d.length;k++){const e=Math.max(ED_MIN_E,Math.min(ED_MAX_E,t.h0[k]+d[k]));t.dl[k]=e-t.h0[k];t.h[k]=e}tReclass(t,0,0,t.k-1,t.k-1);tStats(t)}else{t.ed='';toast('地形の編集データを読み込めなかったため、元の地形を表示します')}}
+ if(ed){const d=edDec(ed,t.k*t.k,edv);if(d){for(let k=0;k<d.length;k++){const e=Math.max(ED_MIN_E,Math.min(ED_MAX_E,t.h0[k]+d[k]));t.dl[k]=e-t.h0[k];t.h[k]=e}tReclass(t,0,0,t.k-1,t.k-1);tStats(t)}else{t.ed='';toast('地形の編集データを読み込めなかったため、元の地形を表示します')}}
 
  if(G && G.works) {
   const activeWorks = G.works.filter(w => w.state === "施工中" && w.patch);
@@ -582,7 +684,7 @@ const EM={on:false,tool:'dig',rc:{dig:0xff6a3d,raise:0x3da5ff,smooth:0x4cd18a,fl
 function emReset(){EM.sel=null;EM.bd=null;EM.selN=0;EM.selBB=null;EM.drag=null;EM.pvOn=false;EM.on=false;EM.stack=[];EM.redo=[];EM.pb=null;EM.stroking=false;EM.last=null;EM.pick=null}
 function emGfx(){if(EM.cols)return;EM.cols=[new THREE.Color(0xff6a3d),new THREE.Color(0x3da5ff)];EM.sc={sel:new THREE.Color(0x37d4ff),bd:new THREE.Color(0xffffff),add:new THREE.Color(0xb6ff3d),sub:new THREE.Color(0xff4d4d)};const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(49*3),3));EM.ring=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff6a3d,depthTest:false,transparent:true}));EM.ring.frustumCulled=false;EM.ring.renderOrder=10;EM.ring.visible=false;MV.sc.add(EM.ring)}
 function mvRay(cx,cy){const r=MV.cv.getBoundingClientRect(),nx=(cx-r.left)/r.width*2-1,ny=-((cy-r.top)/r.height*2-1);mvCam();MV.cam.updateMatrixWorld();const o=MV.cam.position,v=new THREE.Vector3(nx,ny,.5).unproject(MV.cam).sub(o).normalize();return{o:{x:o.x,y:o.y,z:o.z},v:{x:v.x,y:v.y,z:v.z}}}
-function mvPick(cx,cy){const t=MV.t;if(!t||!MV.cv)return null;const q=mvRay(cx,cy);return tRay(t,q.o,q.v,MV.d*2.5+2000,Math.max(2,MV.d*.004))}
+function mvPick(cx,cy){const t=MV.t;if(!t||!MV.cv)return null;const q=mvRay(cx,cy);return tRay(t,q.o,q.v,MV.d*2.5+2000,Math.max(2,Math.min(12,MV.d*.004)))}
 function mvInstances(t,b){const d=new THREE.Object3D(),S=t.size,cs=t.cs,K=t.k,bb=b?[-S/2+b[0]*cs-cs,-S/2+b[1]*cs-cs,-S/2+b[2]*cs+cs,-S/2+b[3]*cs+cs]:null;
  const deadR=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3 || (t.deadRocks && t.deadRocks[k]);};
  const deadT=q=>{const i=Math.min(K-1,Math.max(0,Math.round((q.x+S/2)/cs))),j=Math.min(K-1,Math.max(0,Math.round((q.z+S/2)/cs))),k=j*K+i;return Math.abs(t.h[k]-t.h0[k])>=3 || (t.deadTrees && t.deadTrees[k]);};
@@ -640,95 +742,63 @@ function pushSnapshot() {
   EM.redo = [];
   emRefresh();
 }
-function emRestoreSnapshot(t, snap, isRedo) {
-  if (snap.type === 'commit') {
-    const fwd = isRedo;
-    if (fwd) {
-      if (G.funds < snap.cost) {
-        toast("資金が不足しているため、やり直せません");
-        return false;
-      }
-      G.funds -= snap.cost;
-      tApplyPatch(t, snap.pt, true);
-      const histItem = {
-        id: snap.histId,
-        name: snap.name || "造成工事",
-        area: snap.area || 0, vol: snap.vol || 0, rockArea: snap.rockArea || 0, treeArea: snap.treeArea || 0,
-        cost: snap.cost, startDate: G.date, endDate: G.date, state: "完了"
-      };
-      if (!G.history) G.history = [];
-      G.history.push(histItem);
-    } else {
-      G.funds += snap.cost;
-      tApplyPatch(t, snap.pt, false);
-      if (G.history) {
-        G.history = G.history.filter(h => h.id !== snap.histId);
-      }
-    }
-    emSave(t); saveGame(true);
-    mvEditRefresh(t, snap.pt.bb, true);
-    upd();
-    return true;
-  } else {
-    if (t.pd || t.rd || t.td) tCancel(t, [0,0,t.k-1,t.k-1]);
-    t.pd = snap.pd ? new Float32Array(snap.pd) : null;
-    t.rd = snap.rd ? new Uint8Array(snap.rd) : null;
-    t.td = snap.td ? new Uint8Array(snap.td) : null;
-    EM.pb = snap.pb ? [...snap.pb] : null;
-    if (snap.sel) {
-      if(!EM.sel) EM.sel = new Uint8Array(t.k*t.k);
-      EM.sel.set(snap.sel);
-    } else {
-      EM.sel = null;
-    }
-    EM.selN = snap.selN || 0;
-    EM.selBB = snap.selBB ? [...snap.selBB] : null;
-    EM.op = snap.op;
-    if (snap.copt) EM.copt = snap.copt;
-    if (snap.rvs) EM.rvs = {...snap.rvs};
-    
-    if (t.pd) {
-      for (let k = 0; k < t.k * t.k; k++) {
-        if (t.pd[k] !== 0) t.h[k] = t.h0[k] + t.dl[k] + t.pd[k];
-      }
-    }
-    mvEditRefresh(t, EM.pb || [0,0,t.k-1,t.k-1], false);
-    emColorBB(EM.selBB || [0,0,t.k-1,t.k-1]);
-    return true;
+function emCapturePersistState(t){
+ return{funds:G.funds,history:Array.isArray(G.history)?G.history.slice():G.history,map:{...G.map},savedAt:G.savedAt,ui:G.ui,
+  terrain:{dl:new Float32Array(t.dl),deadRocks:new Uint8Array(t.deadRocks),deadTrees:new Uint8Array(t.deadTrees)}};
+}
+function emRestorePersistState(t,state){
+ G.funds=state.funds;G.history=state.history;G.map=state.map;G.savedAt=state.savedAt;G.ui=state.ui;
+ t.dl=new Float32Array(state.terrain.dl);t.deadRocks=new Uint8Array(state.terrain.deadRocks);t.deadTrees=new Uint8Array(state.terrain.deadTrees);
+ for(let k=0;k<t.h.length;k++)t.h[k]=t.h0[k]+t.dl[k];
+ t.pd=null;t.rd=null;t.td=null;t.ed=G.map.ed||'';
+ EM.pb=null;EM.pvOn=false;EM.stroking=false;EM.last=null;EM.drag=null;
+ EM.sel=null;EM.bd=null;EM.selN=0;EM.selBB=null;
+ EM.stack=EM.stack.filter(x=>x.type==='commit');EM.redo=EM.redo.filter(x=>x.type==='commit');
+ tReclass(t,0,0,t.k-1,t.k-1);tStats(t);
+}
+function emApplyPreviewSnapshot(t,snap){
+ if(t.pd||t.rd||t.td)tCancel(t,[0,0,t.k-1,t.k-1]);
+ t.pd=snap.pd?new Float32Array(snap.pd):null;t.rd=snap.rd?new Uint8Array(snap.rd):null;t.td=snap.td?new Uint8Array(snap.td):null;
+ EM.pb=snap.pb?[...snap.pb]:null;
+ if(snap.sel){if(!EM.sel)EM.sel=new Uint8Array(t.k*t.k);EM.sel.set(snap.sel)}else EM.sel=null;
+ EM.selN=snap.selN||0;EM.selBB=snap.selBB?[...snap.selBB]:null;EM.op=snap.op;
+ if(snap.copt)EM.copt=snap.copt;if(snap.rvs)EM.rvs={...snap.rvs};
+ if(t.pd)for(let k=0;k<t.k*t.k;k++)if(t.pd[k]!==0)t.h[k]=t.h0[k]+t.dl[k]+t.pd[k];
+ mvEditRefresh(t,EM.pb||[0,0,t.k-1,t.k-1],false);emColorBB(EM.selBB||[0,0,t.k-1,t.k-1]);
+}
+function emRestoreSnapshot(t,snap,isRedo){
+ if(snap.type==='commit'){
+  const before=emCapturePersistState(t),fwd=isRedo;
+  try{
+   if(fwd){
+    if(G.funds<snap.cost){toast("資金が不足しているため、やり直せません");return false}
+    G.funds-=snap.cost;tApplyPatch(t,snap.pt,true);
+    const histItem={id:snap.histId,name:snap.name||"造成工事",area:snap.area||0,vol:snap.vol||0,rockArea:snap.rockArea||0,treeArea:snap.treeArea||0,cost:snap.cost,startDate:snap.startDate||G.date,endDate:snap.endDate||snap.startDate||G.date,state:"完了"};
+    if(!G.history)G.history=[];G.history.push(histItem);
+   }else{G.funds+=snap.cost;tApplyPatch(t,snap.pt,false);if(G.history)G.history=G.history.filter(h=>h.id!==snap.histId)}
+   emSave(t);if(!saveGame(true))throw new Error("save failed");
+   mvEditRefresh(t,snap.pt.bb,true);upd();return true;
+  }catch(e){
+   try{emRestorePersistState(t,before)}catch(restoreError){console.error("Undo/Redo rollback failed",restoreError)}
+   try{mvEditRefresh(t,snap.pt.bb,true);upd()}catch(_){}
+   toast("保存または処理に失敗したため、Undo/Redoを取り消しました");return false;
   }
+ }
+ const before=emSaveSnapshot();
+ try{emApplyPreviewSnapshot(t,snap);return true}
+ catch(e){try{if(before)emApplyPreviewSnapshot(t,before)}catch(restoreError){console.error("Preview rollback failed",restoreError)}toast("プレビューのUndo/Redoに失敗しました");return false}
 }
 function emUndo(){
-  const t = MV.t;
-  if(!t || EM.stack.length === 0) return;
-  const snap = EM.stack.pop();
-  if (snap.type === 'commit') {
-    if(EM.pb) emCancel();
-    emRestoreSnapshot(t, snap, false);
-    EM.redo.push(snap);
-  } else {
-    const currentSnap = emSaveSnapshot();
-    if(currentSnap) EM.redo.push(currentSnap);
-    emRestoreSnapshot(t, snap, false);
-  }
-  emRefresh();
+ const t=MV.t;if(!t||EM.stack.length===0)return;const snap=EM.stack.pop();
+ if(snap.type==='commit'){if(EM.pb)emCancel();if(emRestoreSnapshot(t,snap,false))EM.redo.push(snap);else EM.stack.push(snap)}
+ else{const current=emSaveSnapshot();if(emRestoreSnapshot(t,snap,false)){if(current)EM.redo.push(current)}else EM.stack.push(snap)}
+ emRefresh();
 }
 function emRedo(){
-  const t = MV.t;
-  if(!t || EM.redo.length === 0) return;
-  const snap = EM.redo.pop();
-  if (snap.type === 'commit') {
-    if(EM.pb) emCancel();
-    if (emRestoreSnapshot(t, snap, true)) {
-      EM.stack.push(snap);
-    } else {
-      EM.redo.push(snap);
-    }
-  } else {
-    const currentSnap = emSaveSnapshot();
-    if(currentSnap) EM.stack.push(currentSnap);
-    emRestoreSnapshot(t, snap, true);
-  }
-  emRefresh();
+ const t=MV.t;if(!t||EM.redo.length===0)return;const snap=EM.redo.pop();
+ if(snap.type==='commit'){if(EM.pb)emCancel();if(emRestoreSnapshot(t,snap,true))EM.stack.push(snap);else EM.redo.push(snap)}
+ else{const current=emSaveSnapshot();if(emRestoreSnapshot(t,snap,true)){if(current)EM.stack.push(current)}else EM.redo.push(snap)}
+ emRefresh();
 }
 
 function emDown(e,P){if(!EM.on||!MV.t)return;if(EM.mode==='region')return emRDown(e,P);if(P.size>1){EM.stroking=false;EM.last=null;return}if(EM.tool==='view'||(e.pointerType==='mouse'&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;pushSnapshot();EM.stroking=true;EM.last=null;EM.pick=p;EM.ref=tSample(MV.t,p.x,p.z);emStampAt(p);emRingUpdate(p)}
@@ -736,7 +806,7 @@ function emMove(e,P,dx,dy){if(EM.on&&EM.mode==='region')return emRMove(e,P);if(!
 function emUp(e,P){if(EM.on&&EM.mode==='region'){emRUp(e,P);return}if(EM.stroking&&P.size<=1){EM.stroking=false;EM.last=null;emRefresh()}}
 function emHover(e){if(EM.on&&EM.mode==='region'){emRHover(e);return}if(!EM.on||EM.tool==='view'||!MV.t)return;const p=mvPick(e.clientX,e.clientY);EM.pick=p;emRingUpdate(p)}
 function emSave(t){
- G.map.ed=edEnc(t.dl);G.map.tv=TV;if(!G.map.ed)delete G.map.ed;t.ed=G.map.ed||'';
+ G.map.gen=t.gen|| (G.map.gen===4?4:3);G.map.ed=edEnc(t.dl);G.map.edv=2;G.map.tv=t.tv||TV3;if(!G.map.ed)delete G.map.ed;t.ed=G.map.ed||'';
  if(t.deadRocks){
   const dr=[];for(let k=0;k<t.deadRocks.length;k++)if(t.deadRocks[k])dr.push(k);
   if(dr.length>0)G.map.deadRocks=dr;else delete G.map.deadRocks;
@@ -784,45 +854,36 @@ function emCalcCost(t, bb) {
  return {n, mx, area, digVol, fillVol, rockArea, treeArea, cost};
 }
 
+let EM_WORK_SEQ=0;
+function emNewWorkId(){
+ const used=new Set([...(G.history||[]),...(G.works||[])].map(x=>x&&x.id).filter(Boolean));
+ let id;
+ do{id="W_"+Date.now().toString(36)+"_"+(++EM_WORK_SEQ).toString(36)+"_"+Math.random().toString(36).slice(2,10)}while(used.has(id));
+ return id;
+}
 function emCommit(){
  EM.pvOn=false;const t=MV.t;if(!t||!EM.pb)return;
- const stat = emCalcCost(t, EM.pb);
- if(stat.n === 0) { tCancel(t, EM.pb); EM.pb=null; emRefresh(); return; }
- if(G.funds < stat.cost) { toast("資金が不足しています"); return; }
- 
- const pt=tCommitPreview(t,EM.pb), bb=EM.pb; EM.pb=null;
- if(!pt){ mvEditRefresh(t,bb,false);emRefresh();return; }
- 
- const commitSnap = {
-   type: 'commit',
-   pt: pt,
-   cost: stat.cost,
-   histId: "W_" + Date.now(),
-   name: EM.mode === 'region' ? (EM.op==='clear'?"障害物除去(区画)":"造成工事(区画)") : (EM.tool==='clear'?"障害物除去(ブラシ)":"造成工事(ブラシ)"),
-   area: stat.area,
-   vol: stat.digVol + stat.fillVol,
-   rockArea: stat.rockArea,
-   treeArea: stat.treeArea
- };
- 
- G.funds -= stat.cost;
- tApplyPatch(t, pt, true);
- G.history = G.history || [];
- G.history.push({
-  id: commitSnap.histId,
-  name: commitSnap.name,
-  area: commitSnap.area, vol: commitSnap.vol, rockArea: commitSnap.rockArea, treeArea: commitSnap.treeArea,
-  cost: commitSnap.cost, startDate: G.date, endDate: G.date, state: "完了"
- });
- 
- emSave(t); saveGame(true);
- 
- EM.stack.push(commitSnap);
- if(EM.stack.length > 30) EM.stack.shift();
- EM.redo = [];
- 
- mvEditRefresh(t, bb, true); emRefresh(); upd();
- toast("地形造成工事が完了しました");
+ const bb=[...EM.pb],stat=emCalcCost(t,bb);
+ if(stat.n===0){tCancel(t,bb);EM.pb=null;emRefresh();return}
+ if(G.funds<stat.cost){toast("資金が不足しています");return}
+ const before=emCapturePersistState(t);let pt=null;
+ try{
+  pt=tCommitPreview(t,bb);EM.pb=null;
+  if(!pt){mvEditRefresh(t,bb,false);emRefresh();return}
+  const commitSnap={type:'commit',pt,cost:stat.cost,histId:emNewWorkId(),startDate:G.date,endDate:G.date,
+   name:EM.mode==='region'?(EM.op==='clear'?"障害物除去(区画)":"造成工事(区画)"):(EM.tool==='clear'?"障害物除去(ブラシ)":"造成工事(ブラシ)"),
+   area:stat.area,vol:stat.digVol+stat.fillVol,rockArea:stat.rockArea,treeArea:stat.treeArea};
+  G.funds-=stat.cost;tApplyPatch(t,pt,true);G.history=G.history||[];
+  G.history.push({id:commitSnap.histId,name:commitSnap.name,area:commitSnap.area,vol:commitSnap.vol,rockArea:commitSnap.rockArea,treeArea:commitSnap.treeArea,cost:commitSnap.cost,startDate:commitSnap.startDate,endDate:commitSnap.endDate,state:"完了"});
+  emSave(t);if(!saveGame(true))throw new Error("save failed");
+  EM.stack.push(commitSnap);if(EM.stack.length>30)EM.stack.shift();EM.redo=[];
+  mvEditRefresh(t,bb,true);emRefresh();upd();toast("地形造成工事が完了しました");
+ }catch(e){
+  try{emRestorePersistState(t,before)}catch(restoreError){console.error("Commit rollback failed",restoreError)}
+  EM.pb=null;EM.pvOn=false;EM.stroking=false;EM.last=null;
+  try{mvEditRefresh(t,bb,true);emRefresh();upd()}catch(_){}
+  toast("保存または処理に失敗したため、工事確定を取り消しました。プレビューは破棄されました");
+ }
 }
 function emTool(v){EM.tool=v;if(EM.stroking){EM.stroking=false;EM.last=null}if(MV.cv)MV.cv.style.cursor=v==='view'?'grab':'crosshair';emRingUpdate(v==='view'?null:EM.pick);emRefresh()}
 function emPanel(){return `<div class="empanel" id="empanel"><div class="emh"><b>地形造成</b><span id="em-st" class="note"></span></div><div class="seg emmode"><button class="btn" data-e="mode" data-v="brush">自由ブラシ</button><button class="btn" data-e="mode" data-v="region">区画指定</button></div><div id="em-clear-opt" style="display:none; flex-direction:column; gap:4px; padding-bottom:6px; border-bottom:1px solid var(--bd)"><span class="emn">除去対象</span><div class="seg"><button class="btn" data-e="copt" data-v="rock">岩場</button><button class="btn" data-e="copt" data-v="tree">樹木</button><button class="btn" data-e="copt" data-v="both">両方</button></div></div><div id="em-brush"><div class="seg emseg"><button class="btn" data-e="tool" data-v="dig">掘削</button><button class="btn" data-e="tool" data-v="raise">隆起</button><button class="btn" data-e="tool" data-v="smooth">平滑化</button><button class="btn" data-e="tool" data-v="flat">平坦化</button><button class="btn" data-e="tool" data-v="slope">斜面調整</button><button class="btn" data-e="tool" data-v="clear">障害物除去</button><button class="btn" data-e="tool" data-v="view">視点移動</button></div><p class="emn" id="em-h"></p><label class="emr"><span>ブラシサイズ <b id="em-szv"></b></span><input type="range" id="em-size" min="15" max="100" value="${EM.size}"></label><label class="emr"><span>加工強度 <b id="em-stv"></b></span><input type="range" id="em-str" min="1" max="10" value="${EM.str}"></label></div><div id="em-region" style="display:none"><div class="seg emseg2"><button class="btn" data-e="rtool" data-v="rect">矩形</button><button class="btn" data-e="rtool" data-v="paint">なぞり</button><button class="btn" data-e="rtool" data-v="view">視点移動</button></div><div class="seg emseg2"><button class="btn" id="em-add" data-e="radd">追加</button><button class="btn" id="em-sub" data-e="rsub">解除</button><button class="btn" data-e="rclear">選択クリア</button></div><p class="emn" id="em-sel"></p><label class="emr" id="em-sz2"><span>なぞりのサイズ <b id="em-sz2v"></b></span><input type="range" id="em-size2" min="15" max="100" value="${EM.size}"></label><div class="seg emseg2"><button class="btn" data-e="rop" data-v="dig">掘削</button><button class="btn" data-e="rop" data-v="fill">盛土</button><button class="btn" data-e="rop" data-v="flat">平坦化</button><button class="btn" data-e="rop" data-v="slope">斜面調整</button><button class="btn" data-e="rop" data-v="clear">障害物除去</button></div><label class="emr" id="em-vl-w"><span id="em-vl"></span><input type="range" id="em-val" min="1" max="200" value="20"></label><button class="btn" id="em-mean" data-e="rmean" style="display:none">選択範囲の平均標高を取得</button><label class="emr"><span>境界のなだらかさ <b id="em-fev"></b></span><input type="range" id="em-fe" min="1" max="12" value="${EM.rf}"></label></div><div class="emb"><button class="btn p" data-e="commit" id="em-c">工事実行</button><button class="btn" data-e="cancel" id="em-x">キャンセル</button><button class="btn" data-e="undo" id="em-u">取消</button><button class="btn" data-e="redo" id="em-r">やり直す</button><button class="btn" data-e="exit">編集終了</button></div><p class="emn">プレビューを確認して工事を実行します。費用は資金から引かれ、即座に完了します。</p></div>`}
@@ -1046,7 +1107,7 @@ document.addEventListener("click",ev=>{
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
-  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.3.3</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
+  case"cred":modal('<h2>CREDITS</h2><p><b>SNOWSCAPE v0.4.0</b><br>スキーリゾート開発・経営シミュレーション</p><dl><dt>Developer</dt><dd>こりあんだー</dd><dt>Development Support</dt><dd>Claude・ChatGPT</dd></dl><p class="note">山の名称は実在の山を参考にしたものですが、地形データや開発条件はすべてゲーム内の架空設定です。</p>');break;
   case"close":$("#modal").hidden=true;break;
   case"th":ST.theme=v;applyTheme();saveST();rSet();break;
   case"sfx":ST.sfx=v==="1";saveST();rSet();break;
