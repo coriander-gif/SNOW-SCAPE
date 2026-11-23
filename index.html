@@ -258,7 +258,7 @@ function saveGame(quiet){
  return ok;
 }
 function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}if(o.wx&&typeof o.wx==="object"){if(Number.isFinite(o.wx.depth))o.wx.depth=Math.min(1000,o.wx.depth);if(Number.isFinite(o.wx.dd))o.wx.dd=Math.max(-1000,Math.min(1000,o.wx.dd))}
-if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);if(!validCourseList(o.map.courses))delete o.map.courses;
+if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);if(o.map&&Array.isArray(o.map.courses))o.map.courses.forEach(c=>{if(c&&Number.isFinite(c.width))c.width=Math.max(10,Math.min(100,c.width))});if(!validCourseList(o.map.courses))delete o.map.courses;
 if(!o.works) o.works = []; if(!o.history) o.history = [];
 return{data:o,note}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
 function refreshTitle(){$("#bc").disabled=!lsGet(SK);$("#tn").textContent=""}
@@ -639,11 +639,23 @@ function mvCourseRefresh(){
  const group=new THREE.Group(),t=MV.t;(G.map&&Array.isArray(G.map.courses)?G.map.courses:[]).forEach(c=>{const built=courseMakeGeometry(c,t);if(!built)return;const color=COURSE_COLORS[built.metrics.difficulty]||0x32b86b;const mesh=new THREE.Mesh(built.geometry,new THREE.MeshStandardMaterial({color,side:THREE.DoubleSide,roughness:.9,metalness:0}));mesh.renderOrder=3;mesh.userData.courseId=c.id;group.add(mesh)});
  MV.sc.add(group);MV.courseGrp=group;mvDraw();
 }
+function courseSnapPreview(p){
+ if(!MV.sc||!MV.t||!p)return;
+ let best=null,dist=18;
+ for(const c of courseData())for(let i=0;i<c.points.length-1;i++){
+  const a=c.points[i],b=c.points[i+1],dx=b[0]-a[0],dz=b[1]-a[1],ll=dx*dx+dz*dz;if(ll<1)continue;
+  const u=Math.max(0,Math.min(1,((p.x-a[0])*dx+(p.z-a[1])*dz)/ll)),q=[a[0]+u*dx,a[1]+u*dz],d=Math.hypot(p.x-q[0],p.z-q[1]);
+  if(d<dist){dist=d;best=q}
+ }
+ if(!best){if(CS.snapPreview){MV.sc.remove(CS.snapPreview);CS.snapPreview.geometry.dispose();CS.snapPreview.material.dispose();CS.snapPreview=null}return}
+ if(!CS.snapPreview){CS.snapPreview=new THREE.Mesh(new THREE.SphereGeometry(3.5,12,8),new THREE.MeshBasicMaterial({color:0xffd43b,depthTest:false}));CS.snapPreview.renderOrder=21;MV.sc.add(CS.snapPreview)}
+ CS.snapPreview.position.set(best[0],yOf(MV.t,tSample(MV.t,best[0],best[1]))+1.5,best[1]);mvDraw();
+}
 function courseLinePreview(){
  if(!MV.sc||!MV.t)return;if(CS.preview){MV.sc.remove(CS.preview);CS.preview.geometry.dispose();CS.preview.material.dispose();CS.preview=null}
  if(CS.points.length<2)return;const pts=CS.points.map(p=>new THREE.Vector3(p[0],yOf(MV.t,tSample(MV.t,p[0],p[1]))+.45,p[1])),geo=new THREE.BufferGeometry().setFromPoints(pts),line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffd43b,depthTest:false}));line.renderOrder=20;MV.sc.add(line);CS.preview=line;mvDraw();
 }
-function courseRemovePreview(){if(CS.preview&&MV.sc){MV.sc.remove(CS.preview);CS.preview.geometry.dispose();CS.preview.material.dispose()}CS.preview=null}
+function courseRemovePreview(){if(CS.preview&&MV.sc){MV.sc.remove(CS.preview);CS.preview.geometry.dispose();CS.preview.material.dispose()}CS.preview=null;if(CS.snapPreview&&MV.sc){MV.sc.remove(CS.snapPreview);CS.snapPreview.geometry.dispose();CS.snapPreview.material.dispose()}CS.snapPreview=null}
 function courseFinish(points){
  const t=MV.t;if(!t||points.length<2){toast('コースには2点以上必要です');return}
  const clean=[points[0]];for(let i=1;i<points.length;i++)if(Math.hypot(points[i][0]-clean[clean.length-1][0],points[i][1]-clean[clean.length-1][1])>=4)clean.push(points[i]);
@@ -694,19 +706,19 @@ function courseToggle(){
 function coursePanel(){
  const list=courseData(),selected=list.find(c=>c.id===CS.selected),w=selected?selected.width:CS.width;
  let rows='';for(const c of list){const m=courseMetrics(c.points,MV.t),co=(COURSE_COLORS[m.difficulty]||0x32b86b).toString(16).padStart(6,'0');rows+='<div class="csitem"><i class="csdot" style="background:#'+co+'"></i><button class="btn csname '+(CS.selected===c.id?'on':'')+'" data-cs="select" data-id="'+E(c.id)+'">'+E(c.name)+'・'+m.difficulty+'</button><button class="btn" data-cs="delete" data-id="'+E(c.id)+'">削除</button></div>'}
- return '<div class="cspanel" id="cspanel"><b>スキーコース建設</b><div class="seg"><button class="btn '+(CS.mode==='free'?'on':'')+'" data-cs="mode" data-v="free">自由描画</button><button class="btn '+(CS.mode==='ends'?'on':'')+'" data-cs="mode" data-v="ends">始点・終点指定</button></div><p class="emn">'+(CS.mode==='free'?'マップ上を1本指でなぞってコースを描きます。':'始点をタップし、続けて終点をタップします。')+' 既存コースの端点から18m以内で開始・終了すると自動接続します。</p><label class="emr"><span>コース幅 <b id="cs-width-label">'+Math.round(w)+' m</b></span><input id="cs-width" type="range" min="10" max="100" step="5" value="'+Math.min(100,Math.max(10,w))+'"></label><div class="seg"><button class="btn" data-cs="cancel">描画キャンセル</button></div><div><b style="font-size:12px">作成済みコース ('+list.length+')</b><div class="cslist">'+(rows||'<p class="emn">まだコースはありません。</p>')+'</div></div><p class="emn">完成したコースは幅のある帯として表示します。難易度は地形の傾斜から自動判定します。</p><button class="btn" data-cs="close">コース建設を終了</button></div>';
+ return '<div class="cspanel" id="cspanel"><b>スキーコース建設</b><div class="seg"><button class="btn '+(CS.mode==='free'?'on':'')+'" data-cs="mode" data-v="free">自由描画</button><button class="btn '+(CS.mode==='ends'?'on':'')+'" data-cs="mode" data-v="ends">始点・終点指定</button></div><p class="emn">'+(CS.mode==='free'?'マップ上を1本指でなぞってコースを描きます。':'始点をタップし、続けて終点をタップします。')+' 既存コースの中心線から18m以内に始点・終点を置くと接続候補を黄色で表示し、自動接続します。途中に接続する場合は既存コースを分割します。</p><label class="emr"><span>コース幅 <b id="cs-width-label">'+Math.round(w)+' m</b></span><input id="cs-width" type="range" min="10" max="100" step="5" value="'+Math.min(100,Math.max(10,w))+'"></label><div class="seg"><button class="btn" data-cs="cancel">描画キャンセル</button></div><div><b style="font-size:12px">作成済みコース ('+list.length+')</b><div class="cslist">'+(rows||'<p class="emn">まだコースはありません。</p>')+'</div></div><p class="emn">完成したコースは幅のある帯として表示します。難易度は地形の傾斜から自動判定します。</p><button class="btn" data-cs="close">コース建設を終了</button></div>';
 }
 function courseRefreshPanel(){const el=document.getElementById('cspanel');if(!el)return;const fresh=document.createElement('div');fresh.innerHTML=coursePanel();el.replaceWith(fresh.firstElementChild)}
 function courseDown(e,P){
  if(P.size!==1||(e.button!==undefined&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;
- CS.pointerId=e.pointerId;CS.down=[p.x,p.z];CS.downXY=[e.clientX,e.clientY];if(CS.mode==='free'){CS.points=[[p.x,p.z]];courseLinePreview()}
+ CS.pointerId=e.pointerId;CS.down=[p.x,p.z];CS.downXY=[e.clientX,e.clientY];courseSnapPreview(p);if(CS.mode==='free'){CS.points=[[p.x,p.z]];courseLinePreview()}
 }
 function courseCancelGesture(pointerId){
  if(pointerId!==undefined&&CS.pointerId!==pointerId)return;
  CS.pointerId=null;CS.down=null;CS.downXY=null;CS.points=[];courseRemovePreview();mvDraw();
 }
 function courseMove(e,P){
- if(CS.pointerId!==e.pointerId||P.size!==1)return false;const p=mvPick(e.clientX,e.clientY);if(!p)return true;
+ if(CS.pointerId!==e.pointerId||P.size!==1)return false;const p=mvPick(e.clientX,e.clientY);if(!p)return true;courseSnapPreview(p);
  if(CS.mode==='free'&&CS.points.length){const last=CS.points[CS.points.length-1];if(Math.hypot(p.x-last[0],p.z-last[1])>=Math.max(7,MV.t.cs*.8)){CS.points.push([p.x,p.z]);courseLinePreview()}}return true;
 }
 function courseUp(e,P){
