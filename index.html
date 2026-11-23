@@ -258,7 +258,7 @@ function saveGame(quiet){
  return ok;
 }
 function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}if(o.wx&&typeof o.wx==="object"){if(Number.isFinite(o.wx.depth))o.wx.depth=Math.min(1000,o.wx.depth);if(Number.isFinite(o.wx.dd))o.wx.dd=Math.max(-1000,Math.min(1000,o.wx.dd))}
-if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);if(o.map&&Array.isArray(o.map.courses))o.map.courses.forEach(c=>{if(c&&Number.isFinite(c.width))c.width=Math.max(10,Math.min(100,c.width))});if(Array.isArray(o.map.courses)){normalizeCourseNodes(o.map.courses);if(!validCourseList(o.map.courses))delete o.map.courses;}
+if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);if(o.map&&Array.isArray(o.map.courses))o.map.courses.forEach(c=>{if(c&&Number.isFinite(c.width))c.width=Math.max(10,Math.min(100,c.width))});if(Array.isArray(o.map.courses)){const beforeCount=o.map.courses.length;o.map.courses=sanitizeCourseList(o.map.courses);if(o.map.courses.length<beforeCount)note=(note?note+' / ':'')+'一部の不正なコースデータを除外し、接続情報を修復しました'}else if(o.map.courses!==undefined)delete o.map.courses;
 if(!o.works) o.works = []; if(!o.history) o.history = [];
 return{data:o,note}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
 function refreshTitle(){$("#bc").disabled=!lsGet(SK);$("#tn").textContent=""}
@@ -602,6 +602,16 @@ function validCourseList(a){
  }
  for(const n of nodes.values())if(n.count<2)return false;
  return true;
+}
+function sanitizeCourseList(list){
+ if(!Array.isArray(list))return [];
+ const clean=[],ids=new Set();
+ for(const c of list.slice(0,100)){
+  if(!c||typeof c!=='object'||Array.isArray(c)||typeof c.id!=='string'||!c.id||c.id.length>80||ids.has(c.id)||typeof c.name!=='string'||c.name.length>60||!Array.isArray(c.points)||c.points.length<2||c.points.length>2000||!c.points.every(p=>Array.isArray(p)&&p.length===2&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<=1200&&Math.abs(p[1])<=1200)||!Number.isFinite(c.width))continue;
+  ids.add(c.id);c.width=Math.max(10,Math.min(100,c.width));clean.push(c);
+ }
+ normalizeCourseNodes(clean);
+ return clean;
 }
 function normalizeCourseNodes(list){
  if(!Array.isArray(list))return false;
