@@ -225,8 +225,30 @@ function fmtDate(s){const d=new Date(s+"T00:00:00Z");return d.getUTCFullYear()+"
 /* ---- save / load ---- */
 function realDate(s){if(typeof s!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+"T00:00:00Z");return !isNaN(d)&&d.toISOString().slice(0,10)===s}
 const has=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
-function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&typeof o.mountain==="string"&&o.mountain!==""&&o.mountain.length<=40&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100}
-function saveGame(quiet){if(!G)return;G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};const ok=lsSet(SK,JSON.stringify(G));if(!ok)toast("セーブに失敗しました(ブラウザの保存領域を確認してください)");else if(!quiet)toast("セーブしました");refreshTitle();return ok}
+function validWorkList(a){
+ if(a===undefined)return true;
+ if(!Array.isArray(a)||a.length>10000)return false;
+ return a.every(w=>!!w&&typeof w==="object"&&!Array.isArray(w)&&
+  (w.id===undefined||(typeof w.id==="string"&&w.id.length<=128))&&
+  (w.name===undefined||(typeof w.name==="string"&&w.name.length<=120))&&
+  (w.cost===undefined||(Number.isFinite(w.cost)&&w.cost>=0))&&
+  (w.startDate===undefined||realDate(w.startDate))&&
+  (w.endDate===undefined||realDate(w.endDate)));
+}
+function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&typeof o.mountain==="string"&&o.mountain!==""&&o.mountain.length<=40&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100&&validWorkList(o.history)&&validWorkList(o.works)}
+function saveGame(quiet){
+ if(!G)return false;
+ try{
+  G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};
+  const payload=JSON.stringify(G),ok=lsSet(SK,payload);
+  if(!ok)toast("セーブに失敗しました(ブラウザの保存領域を確認してください)");
+  else if(!quiet)toast("セーブしました");
+  refreshTitle();return ok;
+ }catch(e){
+  toast("セーブデータの作成に失敗しました");
+  try{refreshTitle()}catch(_){}
+  return false;
+ }}
 function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}if(o.wx&&typeof o.wx==="object"){if(Number.isFinite(o.wx.depth))o.wx.depth=Math.min(1000,o.wx.depth);if(Number.isFinite(o.wx.dd))o.wx.dd=Math.max(-1000,Math.min(1000,o.wx.dd))}
 if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);
 if(!o.works) o.works = []; if(!o.history) o.history = [];
@@ -640,121 +662,61 @@ function pushSnapshot() {
   EM.redo = [];
   emRefresh();
 }
-function emCapturePersistState(){
-  return {
-    funds:G.funds,
-    history:Array.isArray(G.history)?G.history.slice():G.history,
-    map:{...G.map},
-    savedAt:G.savedAt,
-    ui:G.ui
-  };
+function emCapturePersistState(t){
+ return{funds:G.funds,history:Array.isArray(G.history)?G.history.slice():G.history,map:{...G.map},savedAt:G.savedAt,ui:G.ui,
+  terrain:{dl:new Float32Array(t.dl),deadRocks:new Uint8Array(t.deadRocks),deadTrees:new Uint8Array(t.deadTrees)}};
 }
 function emRestorePersistState(t,state){
-  G.funds=state.funds;
-  G.history=state.history;
-  G.map=state.map;
-  G.savedAt=state.savedAt;
-  G.ui=state.ui;
-  t.ed=G.map.ed||'';
+ G.funds=state.funds;G.history=state.history;G.map=state.map;G.savedAt=state.savedAt;G.ui=state.ui;
+ t.dl=new Float32Array(state.terrain.dl);t.deadRocks=new Uint8Array(state.terrain.deadRocks);t.deadTrees=new Uint8Array(state.terrain.deadTrees);
+ for(let k=0;k<t.h.length;k++)t.h[k]=t.h0[k]+t.dl[k];
+ t.pd=null;t.rd=null;t.td=null;t.ed=G.map.ed||'';
+ EM.pb=null;EM.pvOn=false;EM.stroking=false;EM.last=null;
+ tReclass(t,0,0,t.k-1,t.k-1);tStats(t);
 }
-function emRestoreSnapshot(t, snap, isRedo) {
-  if (snap.type === 'commit') {
-    const before=emCapturePersistState();
-    const fwd = isRedo;
-    if (fwd) {
-      if (G.funds < snap.cost) {
-        toast("資金が不足しているため、やり直せません");
-        return false;
-      }
-      G.funds -= snap.cost;
-      tApplyPatch(t, snap.pt, true);
-      const histItem = {
-        id: snap.histId,
-        name: snap.name || "造成工事",
-        area: snap.area || 0, vol: snap.vol || 0, rockArea: snap.rockArea || 0, treeArea: snap.treeArea || 0,
-        cost: snap.cost, startDate: snap.startDate || G.date, endDate: snap.endDate || snap.startDate || G.date, state: "完了"
-      };
-      if (!G.history) G.history = [];
-      G.history.push(histItem);
-    } else {
-      G.funds += snap.cost;
-      tApplyPatch(t, snap.pt, false);
-      if (G.history) {
-        G.history = G.history.filter(h => h.id !== snap.histId);
-      }
-    }
-    emSave(t);
-    if(!saveGame(true)){
-      tApplyPatch(t,snap.pt,!fwd);
-      emRestorePersistState(t,before);
-      mvEditRefresh(t,snap.pt.bb,true);
-      upd();
-      toast("保存に失敗したため、Undo/Redoを取り消しました");
-      return false;
-    }
-    mvEditRefresh(t, snap.pt.bb, true);
-    upd();
-    return true;
-  } else {
-    if (t.pd || t.rd || t.td) tCancel(t, [0,0,t.k-1,t.k-1]);
-    t.pd = snap.pd ? new Float32Array(snap.pd) : null;
-    t.rd = snap.rd ? new Uint8Array(snap.rd) : null;
-    t.td = snap.td ? new Uint8Array(snap.td) : null;
-    EM.pb = snap.pb ? [...snap.pb] : null;
-    if (snap.sel) {
-      if(!EM.sel) EM.sel = new Uint8Array(t.k*t.k);
-      EM.sel.set(snap.sel);
-    } else {
-      EM.sel = null;
-    }
-    EM.selN = snap.selN || 0;
-    EM.selBB = snap.selBB ? [...snap.selBB] : null;
-    EM.op = snap.op;
-    if (snap.copt) EM.copt = snap.copt;
-    if (snap.rvs) EM.rvs = {...snap.rvs};
-    
-    if (t.pd) {
-      for (let k = 0; k < t.k * t.k; k++) {
-        if (t.pd[k] !== 0) t.h[k] = t.h0[k] + t.dl[k] + t.pd[k];
-      }
-    }
-    mvEditRefresh(t, EM.pb || [0,0,t.k-1,t.k-1], false);
-    emColorBB(EM.selBB || [0,0,t.k-1,t.k-1]);
-    return true;
+function emApplyPreviewSnapshot(t,snap){
+ if(t.pd||t.rd||t.td)tCancel(t,[0,0,t.k-1,t.k-1]);
+ t.pd=snap.pd?new Float32Array(snap.pd):null;t.rd=snap.rd?new Uint8Array(snap.rd):null;t.td=snap.td?new Uint8Array(snap.td):null;
+ EM.pb=snap.pb?[...snap.pb]:null;
+ if(snap.sel){if(!EM.sel)EM.sel=new Uint8Array(t.k*t.k);EM.sel.set(snap.sel)}else EM.sel=null;
+ EM.selN=snap.selN||0;EM.selBB=snap.selBB?[...snap.selBB]:null;EM.op=snap.op;
+ if(snap.copt)EM.copt=snap.copt;if(snap.rvs)EM.rvs={...snap.rvs};
+ if(t.pd)for(let k=0;k<t.k*t.k;k++)if(t.pd[k]!==0)t.h[k]=t.h0[k]+t.dl[k]+t.pd[k];
+ mvEditRefresh(t,EM.pb||[0,0,t.k-1,t.k-1],false);emColorBB(EM.selBB||[0,0,t.k-1,t.k-1]);
+}
+function emRestoreSnapshot(t,snap,isRedo){
+ if(snap.type==='commit'){
+  const before=emCapturePersistState(t),fwd=isRedo;
+  try{
+   if(fwd){
+    if(G.funds<snap.cost){toast("資金が不足しているため、やり直せません");return false}
+    G.funds-=snap.cost;tApplyPatch(t,snap.pt,true);
+    const histItem={id:snap.histId,name:snap.name||"造成工事",area:snap.area||0,vol:snap.vol||0,rockArea:snap.rockArea||0,treeArea:snap.treeArea||0,cost:snap.cost,startDate:snap.startDate||G.date,endDate:snap.endDate||snap.startDate||G.date,state:"完了"};
+    if(!G.history)G.history=[];G.history.push(histItem);
+   }else{G.funds+=snap.cost;tApplyPatch(t,snap.pt,false);if(G.history)G.history=G.history.filter(h=>h.id!==snap.histId)}
+   emSave(t);if(!saveGame(true))throw new Error("save failed");
+   mvEditRefresh(t,snap.pt.bb,true);upd();return true;
+  }catch(e){
+   try{emRestorePersistState(t,before)}catch(restoreError){console.error("Undo/Redo rollback failed",restoreError)}
+   try{mvEditRefresh(t,snap.pt.bb,true);upd()}catch(_){}
+   toast("保存または処理に失敗したため、Undo/Redoを取り消しました");return false;
   }
+ }
+ const before=emSaveSnapshot();
+ try{emApplyPreviewSnapshot(t,snap);return true}
+ catch(e){try{if(before)emApplyPreviewSnapshot(t,before)}catch(restoreError){console.error("Preview rollback failed",restoreError)}toast("プレビューのUndo/Redoに失敗しました");return false}
 }
 function emUndo(){
-  const t = MV.t;
-  if(!t || EM.stack.length === 0) return;
-  const snap = EM.stack.pop();
-  if (snap.type === 'commit') {
-    if(EM.pb) emCancel();
-    if(emRestoreSnapshot(t, snap, false)) EM.redo.push(snap);
-    else EM.stack.push(snap);
-  } else {
-    const currentSnap = emSaveSnapshot();
-    if(currentSnap) EM.redo.push(currentSnap);
-    emRestoreSnapshot(t, snap, false);
-  }
-  emRefresh();
+ const t=MV.t;if(!t||EM.stack.length===0)return;const snap=EM.stack.pop();
+ if(snap.type==='commit'){if(EM.pb)emCancel();if(emRestoreSnapshot(t,snap,false))EM.redo.push(snap);else EM.stack.push(snap)}
+ else{const current=emSaveSnapshot();if(emRestoreSnapshot(t,snap,false)){if(current)EM.redo.push(current)}else EM.stack.push(snap)}
+ emRefresh();
 }
 function emRedo(){
-  const t = MV.t;
-  if(!t || EM.redo.length === 0) return;
-  const snap = EM.redo.pop();
-  if (snap.type === 'commit') {
-    if(EM.pb) emCancel();
-    if (emRestoreSnapshot(t, snap, true)) {
-      EM.stack.push(snap);
-    } else {
-      EM.redo.push(snap);
-    }
-  } else {
-    const currentSnap = emSaveSnapshot();
-    if(currentSnap) EM.stack.push(currentSnap);
-    emRestoreSnapshot(t, snap, true);
-  }
-  emRefresh();
+ const t=MV.t;if(!t||EM.redo.length===0)return;const snap=EM.redo.pop();
+ if(snap.type==='commit'){if(EM.pb)emCancel();if(emRestoreSnapshot(t,snap,true))EM.stack.push(snap);else EM.redo.push(snap)}
+ else{const current=emSaveSnapshot();if(emRestoreSnapshot(t,snap,true)){if(current)EM.stack.push(current)}else EM.redo.push(snap)}
+ emRefresh();
 }
 
 function emDown(e,P){if(!EM.on||!MV.t)return;if(EM.mode==='region')return emRDown(e,P);if(P.size>1){EM.stroking=false;EM.last=null;return}if(EM.tool==='view'||(e.pointerType==='mouse'&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;pushSnapshot();EM.stroking=true;EM.last=null;EM.pick=p;EM.ref=tSample(MV.t,p.x,p.z);emStampAt(p);emRingUpdate(p)}
@@ -819,55 +781,27 @@ function emNewWorkId(){
 }
 function emCommit(){
  EM.pvOn=false;const t=MV.t;if(!t||!EM.pb)return;
- const stat = emCalcCost(t, EM.pb);
- if(stat.n === 0) { tCancel(t, EM.pb); EM.pb=null; emRefresh(); return; }
- if(G.funds < stat.cost) { toast("資金が不足しています"); return; }
- 
- const pt=tCommitPreview(t,EM.pb), bb=EM.pb; EM.pb=null;
- if(!pt){ mvEditRefresh(t,bb,false);emRefresh();return; }
- 
- const before=emCapturePersistState();
- const commitSnap = {
-   type: 'commit',
-   pt: pt,
-   cost: stat.cost,
-   histId: emNewWorkId(),
-   startDate: G.date,
-   endDate: G.date,
-   name: EM.mode === 'region' ? (EM.op==='clear'?"障害物除去(区画)":"造成工事(区画)") : (EM.tool==='clear'?"障害物除去(ブラシ)":"造成工事(ブラシ)"),
-   area: stat.area,
-   vol: stat.digVol + stat.fillVol,
-   rockArea: stat.rockArea,
-   treeArea: stat.treeArea
- };
- 
- G.funds -= stat.cost;
- tApplyPatch(t, pt, true);
- G.history = G.history || [];
- G.history.push({
-  id: commitSnap.histId,
-  name: commitSnap.name,
-  area: commitSnap.area, vol: commitSnap.vol, rockArea: commitSnap.rockArea, treeArea: commitSnap.treeArea,
-  cost: commitSnap.cost, startDate: commitSnap.startDate, endDate: commitSnap.endDate, state: "完了"
- });
- 
- emSave(t);
- if(!saveGame(true)){
-  tApplyPatch(t,pt,false);
-  emRestorePersistState(t,before);
-  mvEditRefresh(t,bb,true);
-  emRefresh();upd();
-  toast("保存に失敗したため、工事確定を取り消しました");
-  return;
+ const bb=[...EM.pb],stat=emCalcCost(t,bb);
+ if(stat.n===0){tCancel(t,bb);EM.pb=null;emRefresh();return}
+ if(G.funds<stat.cost){toast("資金が不足しています");return}
+ const before=emCapturePersistState(t);let pt=null;
+ try{
+  pt=tCommitPreview(t,bb);EM.pb=null;
+  if(!pt){mvEditRefresh(t,bb,false);emRefresh();return}
+  const commitSnap={type:'commit',pt,cost:stat.cost,histId:emNewWorkId(),startDate:G.date,endDate:G.date,
+   name:EM.mode==='region'?(EM.op==='clear'?"障害物除去(区画)":"造成工事(区画)"):(EM.tool==='clear'?"障害物除去(ブラシ)":"造成工事(ブラシ)"),
+   area:stat.area,vol:stat.digVol+stat.fillVol,rockArea:stat.rockArea,treeArea:stat.treeArea};
+  G.funds-=stat.cost;tApplyPatch(t,pt,true);G.history=G.history||[];
+  G.history.push({id:commitSnap.histId,name:commitSnap.name,area:commitSnap.area,vol:commitSnap.vol,rockArea:commitSnap.rockArea,treeArea:commitSnap.treeArea,cost:commitSnap.cost,startDate:commitSnap.startDate,endDate:commitSnap.endDate,state:"完了"});
+  emSave(t);if(!saveGame(true))throw new Error("save failed");
+  EM.stack.push(commitSnap);if(EM.stack.length>30)EM.stack.shift();EM.redo=[];
+  mvEditRefresh(t,bb,true);emRefresh();upd();toast("地形造成工事が完了しました");
+ }catch(e){
+  try{emRestorePersistState(t,before)}catch(restoreError){console.error("Commit rollback failed",restoreError)}
+  EM.pb=null;EM.pvOn=false;EM.stroking=false;EM.last=null;
+  try{mvEditRefresh(t,bb,true);emRefresh();upd()}catch(_){}
+  toast("保存または処理に失敗したため、工事確定を取り消しました。プレビューは破棄されました");
  }
- 
- EM.stack.push(commitSnap);
- if(EM.stack.length > 30) EM.stack.shift();
- EM.redo = [];
- 
- mvEditRefresh(t, bb, true); emRefresh(); upd();
- toast("地形造成工事が完了しました");
-}
 function emTool(v){EM.tool=v;if(EM.stroking){EM.stroking=false;EM.last=null}if(MV.cv)MV.cv.style.cursor=v==='view'?'grab':'crosshair';emRingUpdate(v==='view'?null:EM.pick);emRefresh()}
 function emPanel(){return `<div class="empanel" id="empanel"><div class="emh"><b>地形造成</b><span id="em-st" class="note"></span></div><div class="seg emmode"><button class="btn" data-e="mode" data-v="brush">自由ブラシ</button><button class="btn" data-e="mode" data-v="region">区画指定</button></div><div id="em-clear-opt" style="display:none; flex-direction:column; gap:4px; padding-bottom:6px; border-bottom:1px solid var(--bd)"><span class="emn">除去対象</span><div class="seg"><button class="btn" data-e="copt" data-v="rock">岩場</button><button class="btn" data-e="copt" data-v="tree">樹木</button><button class="btn" data-e="copt" data-v="both">両方</button></div></div><div id="em-brush"><div class="seg emseg"><button class="btn" data-e="tool" data-v="dig">掘削</button><button class="btn" data-e="tool" data-v="raise">隆起</button><button class="btn" data-e="tool" data-v="smooth">平滑化</button><button class="btn" data-e="tool" data-v="flat">平坦化</button><button class="btn" data-e="tool" data-v="slope">斜面調整</button><button class="btn" data-e="tool" data-v="clear">障害物除去</button><button class="btn" data-e="tool" data-v="view">視点移動</button></div><p class="emn" id="em-h"></p><label class="emr"><span>ブラシサイズ <b id="em-szv"></b></span><input type="range" id="em-size" min="15" max="100" value="${EM.size}"></label><label class="emr"><span>加工強度 <b id="em-stv"></b></span><input type="range" id="em-str" min="1" max="10" value="${EM.str}"></label></div><div id="em-region" style="display:none"><div class="seg emseg2"><button class="btn" data-e="rtool" data-v="rect">矩形</button><button class="btn" data-e="rtool" data-v="paint">なぞり</button><button class="btn" data-e="rtool" data-v="view">視点移動</button></div><div class="seg emseg2"><button class="btn" id="em-add" data-e="radd">追加</button><button class="btn" id="em-sub" data-e="rsub">解除</button><button class="btn" data-e="rclear">選択クリア</button></div><p class="emn" id="em-sel"></p><label class="emr" id="em-sz2"><span>なぞりのサイズ <b id="em-sz2v"></b></span><input type="range" id="em-size2" min="15" max="100" value="${EM.size}"></label><div class="seg emseg2"><button class="btn" data-e="rop" data-v="dig">掘削</button><button class="btn" data-e="rop" data-v="fill">盛土</button><button class="btn" data-e="rop" data-v="flat">平坦化</button><button class="btn" data-e="rop" data-v="slope">斜面調整</button><button class="btn" data-e="rop" data-v="clear">障害物除去</button></div><label class="emr" id="em-vl-w"><span id="em-vl"></span><input type="range" id="em-val" min="1" max="200" value="20"></label><button class="btn" id="em-mean" data-e="rmean" style="display:none">選択範囲の平均標高を取得</button><label class="emr"><span>境界のなだらかさ <b id="em-fev"></b></span><input type="range" id="em-fe" min="1" max="12" value="${EM.rf}"></label></div><div class="emb"><button class="btn p" data-e="commit" id="em-c">工事実行</button><button class="btn" data-e="cancel" id="em-x">キャンセル</button><button class="btn" data-e="undo" id="em-u">取消</button><button class="btn" data-e="redo" id="em-r">やり直す</button><button class="btn" data-e="exit">編集終了</button></div><p class="emn">プレビューを確認して工事を実行します。費用は資金から引かれ、即座に完了します。</p></div>`}
 function emRefresh(){const t=MV.t,q=s=>document.getElementById(s);if(!q('empanel'))return;
