@@ -540,7 +540,7 @@ function mvBind(cv){
   P.set(e.pointerId,[e.clientX,e.clientY]);
   pd=pdist();pc=pcenter();
   const tv=EM.mode==='region'?EM.rtool:EM.tool;
-  cv.style.cursor=EM.on&&tv!=='view'?'crosshair':'grabbing';
+  cv.style.cursor=CS.on?'crosshair':(EM.on&&tv!=='view'?'crosshair':'grabbing');
   if(CS.on)courseDown(e,P);else emDown(e,P);
  });
  cv.addEventListener('pointermove',e=>{
@@ -563,7 +563,7 @@ function mvBind(cv){
   if(CS.on)courseUp(e,P);else emUp(e,P);
   P.delete(e.pointerId);
   pd=pdist();pc=pcenter();
-  if(!P.size){const tv=EM.mode==='region'?EM.rtool:EM.tool;cv.style.cursor=EM.on&&tv!=='view'?'crosshair':'grab';}
+  if(!P.size){const tv=EM.mode==='region'?EM.rtool:EM.tool;cv.style.cursor=CS.on?'crosshair':(EM.on&&tv!=='view'?'crosshair':'grab');}
  };
  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
  cv.addEventListener('wheel',e=>{e.preventDefault();mvZoom(Math.exp((e.deltaMode===1?e.deltaY*33:e.deltaY)*.0012))},{passive:false});
