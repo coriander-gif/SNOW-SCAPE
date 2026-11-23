@@ -238,17 +238,18 @@ function validWorkList(a){
 function validSave(o){return !!o&&typeof o==="object"&&typeof o.name==="string"&&o.name.trim()!==""&&o.name.length<=60&&has(REG,o.region)&&typeof o.mountain==="string"&&o.mountain!==""&&o.mountain.length<=40&&has(DIFF,o.diff)&&typeof o.rival==="boolean"&&Number.isFinite(o.funds)&&o.funds>=0&&realDate(o.date)&&Number.isInteger(o.day)&&o.day>=1&&typeof o.phase==="string"&&Number.isFinite(o.reputation)&&o.reputation>=0&&o.reputation<=100&&validWorkList(o.history)&&validWorkList(o.works)}
 function saveGame(quiet){
  if(!G)return false;
+ let ok=false;
  try{
   G.savedAt=Date.now();G.ui={theme:ST.theme,sfx:ST.sfx,vol:ST.vol};
-  const payload=JSON.stringify(G),ok=lsSet(SK,payload);
-  if(!ok)toast("セーブに失敗しました(ブラウザの保存領域を確認してください)");
-  else if(!quiet)toast("セーブしました");
-  refreshTitle();return ok;
+  const payload=JSON.stringify(G);ok=lsSet(SK,payload);
  }catch(e){
-  toast("セーブデータの作成に失敗しました");
-  try{refreshTitle()}catch(_){}
-  return false;
- }}
+  toast("セーブデータの作成に失敗しました");return false;
+ }
+ if(!ok)toast("セーブに失敗しました(ブラウザの保存領域を確認してください)");
+ else if(!quiet)toast("セーブしました");
+ try{refreshTitle()}catch(e){console.error("Title save indicator update failed",e)}
+ return ok;
+}
 function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}if(o.wx&&typeof o.wx==="object"){if(Number.isFinite(o.wx.depth))o.wx.depth=Math.min(1000,o.wx.depth);if(Number.isFinite(o.wx.dd))o.wx.dd=Math.max(-1000,Math.min(1000,o.wx.dd))}
 if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);
 if(!o.works) o.works = []; if(!o.history) o.history = [];
