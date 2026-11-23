@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SNOWSCAPE v0.4.0</title>
+<title>SNOWSCAPE v0.5.0 Alpha</title>
 <style>
 html,body{touch-action:manipulation}
 :root{--bg:#F3F7FA;--card:#FFFFFF;--main:#287CA8;--acc:#79C8E8;--tx:#183247;--sub:#718494;--bd:#DCE6ED;--on:#FFFFFF;--r:14px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
@@ -58,6 +58,12 @@ main.wide .map.m3.big{height:max(360px,calc(100vh - var(--hh,64px) - var(--nh,0p
 .mchip i{width:9px;height:9px;border-radius:50%;display:inline-block;border:1px solid var(--bd)}
 .mbtn{display:flex;gap:6px}.mbtn .btn{padding:6px 12px;font-size:13px}
 .mbtn{flex-wrap:wrap;justify-content:flex-end}
+ .cspanel{position:absolute;top:44px;left:10px;width:min(310px,calc(100% - 20px));max-height:calc(100% - 110px);overflow:auto;background:color-mix(in srgb,var(--card) 92%,transparent);border:1px solid var(--bd);border-radius:14px;padding:10px 12px;color:var(--tx);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;flex-direction:column;gap:8px;touch-action:pan-y}
+ .cspanel .seg{flex-wrap:wrap}.cspanel .seg .btn{flex:1 1 44%;padding:7px 5px;font-size:12px}
+ .cslist{display:flex;flex-direction:column;gap:5px}.csitem{display:flex;align-items:center;gap:6px}.csitem .btn{padding:5px 8px;font-size:12px;min-width:0}.csitem .csname{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .csdot{width:10px;height:10px;border-radius:50%;flex:none}
+ .cspanel input[type=range]{width:100%;accent-color:var(--main)}
+ @media(max-width:600px){.cspanel{top:44px;left:8px;right:8px;width:auto;max-height:42%}}
 .empanel{position:absolute;top:44px;right:10px;width:280px;max-height:calc(100% - 110px);overflow:auto;background:color-mix(in srgb,var(--card) 90%,transparent);border:1px solid var(--bd);border-radius:14px;padding:10px 12px;color:var(--tx);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;flex-direction:column;gap:8px}
 .emh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .emseg,.emseg2{flex-wrap:wrap}.emseg .btn,.emseg2 .btn{flex:1 1 30%;padding:8px 4px;font-size:13px}.emmode .btn{flex:1;padding:8px 4px;font-size:13px}
@@ -140,7 +146,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0 0}dt{co
   <polygon points="0,300 0,270 200,230 420,265 620,235 800,270 800,300" fill="#fff"/>
  </svg>
  <div class="tc">
-  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.4.0</p>
+  <h1>SNOWSCAPE</h1><p>ALPINE RESORT MANAGEMENT · v0.5.0 Alpha</p>
   <div class="tm">
    <button class="btn p" data-a="new">NEW GAME</button>
    <button class="btn" id="bc" data-a="cont">CONTINUE</button>
@@ -252,7 +258,7 @@ function saveGame(quiet){
  return ok;
 }
 function loadGame(){const raw=lsGet(SK);if(!raw)return{err:"セーブデータがありません"};try{const o=JSON.parse(raw);if(o&&typeof o==="object"){if(o.reputation===undefined)o.reputation=50;if(o.phase===undefined)o.phase="開業準備中"}if(!validSave(o))throw 0;let note="";if(!REG[o.region].includes(o.mountain)){const m=o.mountain,c=MAP_OLD[m]||(m+"周辺");if(REG[o.region].includes(c)){o.mountain=c;note="山岳名を新しい候補名「"+c+"」に更新しました"}else note="「"+m+"」は現在の山岳候補にない旧候補です。そのまま続行できます"}if(o.wx&&typeof o.wx==="object"){if(Number.isFinite(o.wx.depth))o.wx.depth=Math.min(1000,o.wx.depth);if(Number.isFinite(o.wx.dd))o.wx.dd=Math.max(-1000,Math.min(1000,o.wx.dd))}
-if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);
+if(!validWx(o.wx)){o.wx=initWx(o);note=(note?note+" / ":"")+"山岳コンディションを新たに生成しました"}if(!validMap(o.map))o.map=initMap(o);if(!validCourseList(o.map.courses))delete o.map.courses;
 if(!o.works) o.works = []; if(!o.history) o.history = [];
 return{data:o,note}}catch(_){return{err:"セーブデータが破損しているため読み込めませんでした。NEW GAMEで新しく始めてください。"}}}
 function refreshTitle(){$("#bc").disabled=!lsGet(SK);$("#tn").textContent=""}
@@ -509,7 +515,7 @@ function mvBuild(t){
  const d=new THREE.Object3D();
  if(t.trees.length){const g=new THREE.ConeGeometry(1.3,4.2,6);g.translate(0,2.1,0);const im=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({color:0x2f6b3f,flatShading:true,roughness:1}),t.trees.length);im.frustumCulled=false;MV.imT=im;grp.add(im)}
  if(t.rocks.length){const im=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0x6c7078,flatShading:true,roughness:1}),t.rocks.length);im.frustumCulled=false;MV.imR=im;grp.add(im)}
- MV.sc.add(grp);MV.grp=grp;MV.geo=geo;MV.t=t;MV.key=t.key;if(t.dl)mvInstances(t,null)}
+ MV.sc.add(grp);MV.grp=grp;MV.geo=geo;MV.t=t;MV.key=t.key;if(t.dl)mvInstances(t,null);mvCourseRefresh()}
 function mvColor(depth,rb){
  if(!MV.geo)return;const t=MV.t,col=MV.geo.attributes.color,K=t.k,N=t.n,s=Math.min(1,depth/150),hs=.92-.82*s-Math.max(0,Math.min(1,(depth-150)/850))*.3,c=new THREE.Color(),w=new THREE.Color(0xffffff);
  for(let j=rb?rb[1]:0;j<=(rb?rb[3]:K-1);j++)for(let i=rb?rb[0]:0;i<=(rb?rb[2]:K-1);i++){const k=j*K+i,ty=t.cellType[Math.min(j,N-1)*N+Math.min(i,N-1)],hn=(t.h[k]-t.base)/t.rel;c.setHex(TCOL[ty]);
@@ -535,13 +541,13 @@ function mvBind(cv){
   pd=pdist();pc=pcenter();
   const tv=EM.mode==='region'?EM.rtool:EM.tool;
   cv.style.cursor=EM.on&&tv!=='view'?'crosshair':'grabbing';
-  emDown(e,P);
+  if(CS.on)courseDown(e,P);else emDown(e,P);
  });
  cv.addEventListener('pointermove',e=>{
   const o=P.get(e.pointerId);if(!o){emHover(e);return}
   const dx=e.clientX-o[0],dy=e.clientY-o[1];
   P.set(e.pointerId,[e.clientX,e.clientY]);
-  if(emMove(e,P,dx,dy)){pd=pdist();pc=pcenter();return;}
+  if(CS.on&&courseMove(e,P)){pd=pdist();pc=pcenter();return;}if(emMove(e,P,dx,dy)){pd=pdist();pc=pcenter();return;}
   if(P.size===1){
    if(e.pointerType==='mouse'&&e.buttons===2){mvPan(dx,dy);}
    else if(e.pointerType==='mouse'&&e.buttons===1){MV.yaw-=dx*0.006;MV.pitch=Math.max(0.05,Math.min(1.5,MV.pitch+dy*0.006));mvDraw();}
@@ -554,7 +560,7 @@ function mvBind(cv){
   }
  });
  const up=e=>{
-  emUp(e,P);
+  if(CS.on)courseUp(e,P);else emUp(e,P);
   P.delete(e.pointerId);
   pd=pdist();pc=pcenter();
   if(!P.size){const tv=EM.mode==='region'?EM.rtool:EM.tool;cv.style.cursor=EM.on&&tv!=='view'?'crosshair':'grab';}
@@ -564,11 +570,95 @@ function mvBind(cv){
  cv.addEventListener('webglcontextlost',e=>e.preventDefault());
  cv.addEventListener('webglcontextrestored',()=>{if(MV.t&&G){mvBuild(MV.t);mvColor(G.wx.depth);mvDraw()}});
 }
-function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button><button class="btn p" data-m="edit">地形造成工事</button></span></div>`}
+function hud(){return `<div class="mh top"><span class="mchip"><b>${E(G.mountain)}</b>・ゲーム内の架空地形</span></div><div class="mh bot"><span class="mleg">${TJ.map((n,i)=>`<span class="mchip"><i style="background:#${TCOL[i].toString(16).padStart(6,'0')}"></i>${n}</span>`).join('')}</span><span class="mbtn"><button class="btn" data-m="in" aria-label="拡大">＋</button><button class="btn" data-m="out" aria-label="縮小">－</button><button class="btn" data-m="reset">RESET</button><button class="btn" data-m="courses">コース建設</button><button class="btn p" data-m="edit">地形造成工事</button></span></div>${CS.on?coursePanel():''}${EM.on?emPanel():''}`}
 function layoutVars(){const h=$('.hd'),n=$('#nav'),s=document.documentElement.style;s.setProperty('--hh',(h?h.offsetHeight:64)+'px');s.setProperty('--nh',n&&getComputedStyle(n).position==='fixed'?n.offsetHeight+'px':'0px')}
 function mapPage(){return '<div class="map m3 big" id="mapbox"></div>'}
 function seasonOf(d){return['冬','冬','早春','春','春','初夏','夏','夏','初秋','秋','晩秋','初冬'][+d.split('-')[1]-1]}
 
+
+/* ===== v0.5.0 スキーコース建設 ===== */
+const COURSE_COLORS={初級:0x32b86b,中級:0x3488e8,上級:0xe34b4b,最上級:0x252a32};
+function validCourseList(a){
+ if(a===undefined)return true;
+ if(!Array.isArray(a)||a.length>100)return false;
+ return a.every(c=>c&&typeof c==='object'&&typeof c.id==='string'&&c.id.length<=80&&typeof c.name==='string'&&c.name.length<=60&&Array.isArray(c.points)&&c.points.length>=2&&c.points.length<=2000&&c.points.every(p=>Array.isArray(p)&&p.length===2&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<=1200&&Math.abs(p[1])<=1200)&&Number.isFinite(c.width)&&c.width>=10&&c.width<=150);
+}
+function courseData(){if(!G.map.courses)G.map.courses=[];return G.map.courses}
+function courseSample(points,t){
+ const out=[];if(!Array.isArray(points)||points.length<2)return out;const step=Math.max(3,Math.min(6,t.cs*.55));
+ for(let i=0;i<points.length-1;i++){const a=points[i],b=points[i+1],L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.ceil(L/step));for(let k=0;k<n;k++){const u=k/n,p=[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];if(!out.length||Math.hypot(p[0]-out[out.length-1][0],p[1]-out[out.length-1][1])>.05)out.push(p)}}
+ out.push([...points[points.length-1]]);return out;
+}
+function courseMetrics(points,t){
+ const p=courseSample(points,t);let len=0,horiz=0,vert=0,maxSlope=0;
+ for(let i=1;i<p.length;i++){const dx=p[i][0]-p[i-1][0],dz=p[i][1]-p[i-1][1],dh=tSample(t,p[i][0],p[i][1])-tSample(t,p[i-1][0],p[i-1][1]),h=Math.hypot(dx,dz);horiz+=h;vert+=Math.abs(dh);len+=Math.hypot(h,dh);if(h>0)maxSlope=Math.max(maxSlope,Math.atan(Math.abs(dh)/h)*180/Math.PI)}
+ const avgSlope=horiz?Math.atan(vert/horiz)*180/Math.PI:0,difficulty=avgSlope<10?'初級':avgSlope<18?'中級':avgSlope<27?'上級':'最上級';
+ return{points:p,length:len,avgSlope,maxSlope,difficulty};
+}
+function courseMakeGeometry(c,t){
+ const m=courseMetrics(c.points,t),p=m.points;if(p.length<2)return null;const pos=[],idx=[],half=c.width/2;
+ for(let i=0;i<p.length;i++){const a=p[Math.max(0,i-1)],b=p[Math.min(p.length-1,i+1)],dx=b[0]-a[0],dz=b[1]-a[1],L=Math.hypot(dx,dz)||1,nx=-dz/L,nz=dx/L;
+  for(const side of [-1,1]){const x=p[i][0]+nx*half*side,z=p[i][1]+nz*half*side,y=yOf(t,tSample(t,x,z))+1.8;pos.push(x,y,z)}
+  if(i<p.length-1){const k=i*2;idx.push(k,k+1,k+2,k+1,k+3,k+2)}}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return{geometry:g,metrics:m};
+}
+function mvCourseRefresh(){
+ if(!MV.sc||!MV.t||!G)return;
+ if(MV.courseGrp){MV.sc.remove(MV.courseGrp);MV.courseGrp.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}
+ const group=new THREE.Group(),t=MV.t;(G.map&&Array.isArray(G.map.courses)?G.map.courses:[]).forEach(c=>{const built=courseMakeGeometry(c,t);if(!built)return;const color=COURSE_COLORS[built.metrics.difficulty]||0x32b86b;const mesh=new THREE.Mesh(built.geometry,new THREE.MeshStandardMaterial({color,side:THREE.DoubleSide,roughness:.9,metalness:0}));mesh.renderOrder=3;mesh.userData.courseId=c.id;group.add(mesh)});
+ MV.sc.add(group);MV.courseGrp=group;mvDraw();
+}
+function courseLinePreview(){
+ if(!MV.sc||!MV.t)return;if(CS.preview){MV.sc.remove(CS.preview);CS.preview.geometry.dispose();CS.preview.material.dispose();CS.preview=null}
+ if(CS.points.length<2)return;const pts=CS.points.map(p=>new THREE.Vector3(p[0],yOf(MV.t,tSample(MV.t,p[0],p[1]))+3,p[1])),geo=new THREE.BufferGeometry().setFromPoints(pts),line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffd43b,depthTest:false}));line.renderOrder=20;MV.sc.add(line);CS.preview=line;mvDraw();
+}
+function courseRemovePreview(){if(CS.preview&&MV.sc){MV.sc.remove(CS.preview);CS.preview.geometry.dispose();CS.preview.material.dispose()}CS.preview=null}
+function courseFinish(points){
+ const t=MV.t;if(!t||points.length<2){toast('コースには2点以上必要です');return}
+ const clean=[points[0]];for(let i=1;i<points.length;i++)if(Math.hypot(points[i][0]-clean[clean.length-1][0],points[i][1]-clean[clean.length-1][1])>=4)clean.push(points[i]);
+ if(clean.length<2||courseMetrics(clean,t).length<30){toast('コースが短すぎます。もう少し長く描いてください');return}
+ const list=courseData();if(list.length>=100){toast('コースは最大100本までです');return}
+ const id='C_'+Date.now().toString(36)+'_'+(++CS.seq).toString(36),c={id,name:'コース'+String(list.length+1).padStart(2,'0'),points:clean,width:CS.width};list.push(c);CS.selected=id;courseRemovePreview();CS.points=[];CS.endpointFirst=null;
+ if(!saveGame(true)){list.pop();CS.selected=null;toast('保存に失敗したためコースを追加できませんでした');return}
+ mvCourseRefresh();courseRefreshPanel();toast('コースを作成しました');
+}
+function courseToggle(){
+ if(EM.on){toast('先に地形造成を終了してください');return}
+ if(!MV.ok||!MV.t||!MV.box){toast('3Dマップを表示できないためコース建設を利用できません');return}
+ CS.on=!CS.on;CS.pointerId=null;CS.points=[];CS.endpointFirst=null;courseRemovePreview();
+ if(CS.on){MV.box.insertAdjacentHTML('beforeend',coursePanel());courseRefreshPanel();MV.cv.style.cursor='crosshair'}else{const p=document.getElementById('cspanel');if(p)p.remove();MV.cv.style.cursor='grab'}mvDraw();
+}
+function coursePanel(){
+ const list=courseData(),selected=list.find(c=>c.id===CS.selected),w=selected?selected.width:CS.width;
+ let rows='';for(const c of list){const m=courseMetrics(c.points,MV.t),co=(COURSE_COLORS[m.difficulty]||0x32b86b).toString(16).padStart(6,'0');rows+='<div class="csitem"><i class="csdot" style="background:#'+co+'"></i><button class="btn csname '+(CS.selected===c.id?'on':'')+'" data-cs="select" data-id="'+E(c.id)+'">'+E(c.name)+'・'+m.difficulty+'</button><button class="btn" data-cs="delete" data-id="'+E(c.id)+'">削除</button></div>'}
+ return '<div class="cspanel" id="cspanel"><b>スキーコース建設</b><div class="seg"><button class="btn '+(CS.mode==='free'?'on':'')+'" data-cs="mode" data-v="free">自由描画</button><button class="btn '+(CS.mode==='ends'?'on':'')+'" data-cs="mode" data-v="ends">始点・終点指定</button></div><p class="emn">'+(CS.mode==='free'?'マップ上を1本指でなぞってコースを描きます。':'始点をタップし、続けて終点をタップします。')+'</p><label class="emr"><span>コース幅 <b id="cs-width-label">'+Math.round(w)+' m</b></span><input id="cs-width" type="range" min="10" max="100" step="5" value="'+w+'"></label><div class="seg"><button class="btn" data-cs="cancel">描画キャンセル</button></div><div><b style="font-size:12px">作成済みコース ('+list.length+')</b><div class="cslist">'+(rows||'<p class="emn">まだコースはありません。</p>')+'</div></div><p class="emn">完成したコースは幅のある帯として表示します。難易度は地形の傾斜から自動判定します。</p><button class="btn" data-cs="close">コース建設を終了</button></div>';
+}
+function courseRefreshPanel(){const el=document.getElementById('cspanel');if(!el)return;const fresh=document.createElement('div');fresh.innerHTML=coursePanel();el.replaceWith(fresh.firstElementChild)}
+function courseDown(e,P){
+ if(P.size!==1||(e.button!==undefined&&e.button!==0))return;const p=mvPick(e.clientX,e.clientY);if(!p)return;
+ CS.pointerId=e.pointerId;CS.down=[p.x,p.z];CS.downXY=[e.clientX,e.clientY];if(CS.mode==='free'){CS.points=[[p.x,p.z]];courseLinePreview()}
+}
+function courseMove(e,P){
+ if(CS.pointerId!==e.pointerId||P.size!==1)return false;const p=mvPick(e.clientX,e.clientY);if(!p)return true;
+ if(CS.mode==='free'&&CS.points.length){const last=CS.points[CS.points.length-1];if(Math.hypot(p.x-last[0],p.z-last[1])>=Math.max(7,MV.t.cs*.8)){CS.points.push([p.x,p.z]);courseLinePreview()}}return true;
+}
+function courseUp(e,P){
+ if(CS.pointerId!==e.pointerId)return;const p=mvPick(e.clientX,e.clientY);CS.pointerId=null;
+ if(CS.mode==='free'){if(p){const last=CS.points[CS.points.length-1];if(!last||Math.hypot(p.x-last[0],p.z-last[1])>2)CS.points.push([p.x,p.z])}if(CS.points.length>=2)courseFinish(CS.points);else{courseRemovePreview();CS.points=[];toast('コースを描けませんでした。もう一度なぞってください')}}
+ else{const moved=CS.downXY&&Math.hypot(e.clientX-CS.downXY[0],e.clientY-CS.downXY[1])>12;if(!moved&&p){if(!CS.endpointFirst){CS.endpointFirst=[p.x,p.z];toast('始点を設定しました。終点をタップしてください')}else courseFinish([CS.endpointFirst,[p.x,p.z]])}}
+ CS.down=null;CS.downXY=null;mvDraw();
+}
+document.addEventListener('click',e=>{
+ const b=e.target.closest('[data-cs]');if(!b||!CS.on)return;const a=b.dataset.cs,id=b.dataset.id,v=b.dataset.v,list=courseData();
+ if(a==='mode'){CS.mode=v;CS.points=[];CS.endpointFirst=null;courseRemovePreview();courseRefreshPanel()}
+ else if(a==='cancel'){CS.points=[];CS.endpointFirst=null;CS.pointerId=null;courseRemovePreview();toast('描画をキャンセルしました');courseRefreshPanel()}
+ else if(a==='close')courseToggle();
+ else if(a==='select'){CS.selected=id;const c=list.find(x=>x.id===id);if(c)CS.width=c.width;courseRefreshPanel()}
+ else if(a==='delete'){const i=list.findIndex(x=>x.id===id);if(i>=0&&confirm('このコースを削除しますか？')){const old=list.splice(i,1)[0];if(!saveGame(true)){list.splice(i,0,old);toast('保存に失敗したため削除を取り消しました')}else{if(CS.selected===id)CS.selected=null;mvCourseRefresh();courseRefreshPanel()}}}
+});
+document.addEventListener('input',e=>{
+ if(e.target.id==='cs-width'&&CS.on){CS.width=+e.target.value;const c=courseData().find(x=>x.id===CS.selected);if(c){c.width=CS.width;const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m';mvCourseRefresh();saveGame(true)}else{const m=document.getElementById('cs-width-label');if(m)m.textContent=CS.width+' m'}}
+});
 /* ===== v0.4.0 地形編集・造成工事システム ===== */
 const ED_MAX=800,ED_MIN_E=400,ED_MAX_E=3400,ED_TALUS=1.5;
 function edEnc(dl){const n=dl.length,u=new Int16Array(n);let any=false;for(let i=0;i<n;i++){const v=Math.max(-ED_MAX*10,Math.min(ED_MAX*10,Math.round(dl[i]*10)));u[i]=v;if(v)any=true}if(!any)return '';const b=new Uint8Array(u.buffer);let s='';for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s)}
@@ -681,7 +771,8 @@ function tApplyPatch(t,p,fwd){
 function tRay(t,o,v,maxT,st){const S=t.size/2;let prev=0;for(let s=0;s<maxT;s+=st){const x=o.x+v.x*s,z=o.z+v.z*s,y=o.y+v.y*s;if(Math.abs(x)>S||Math.abs(z)>S){if(y<-40)break;prev=s;continue}
   if(y<=yOf(t,tSample(t,x,z))){let a=prev,b=s;for(let n=0;n<10;n++){const m=(a+b)/2;if(o.y+v.y*m<=yOf(t,tSample(t,o.x+v.x*m,o.z+v.z*m)))b=m;else a=m}const f=(a+b)/2;return{x:o.x+v.x*f,z:o.z+v.z*f}}prev=s}return null}
 
-const EM={on:false,tool:'dig',rc:{dig:0xff6a3d,raise:0x3da5ff,smooth:0x4cd18a,flat:0xffd23d,slope:0xb06cff,clear:0x888888,sel:0x37d4ff},copt:'rock',ref:null,mode:'brush',rtool:'rect',rsub:false,op:'dig',rvs:{dig:20,fill:20,flat:0,slope:15,clear:1},rf:4,flatAuto:true,sel:null,bd:null,selN:0,selBB:null,drag:null,pvOn:false,sc:null,size:40,str:5,stack:[],redo:[],stroking:false,last:null,pick:null,pb:null,cols:null,ring:null};
+const CS={on:false,mode:'free',width:40,points:[],pointerId:null,down:null,downXY:null,selected:null,preview:null,endpointFirst:null,seq:0};
+ const EM={on:false,tool:'dig',rc:{dig:0xff6a3d,raise:0x3da5ff,smooth:0x4cd18a,flat:0xffd23d,slope:0xb06cff,clear:0x888888,sel:0x37d4ff},copt:'rock',ref:null,mode:'brush',rtool:'rect',rsub:false,op:'dig',rvs:{dig:20,fill:20,flat:0,slope:15,clear:1},rf:4,flatAuto:true,sel:null,bd:null,selN:0,selBB:null,drag:null,pvOn:false,sc:null,size:40,str:5,stack:[],redo:[],stroking:false,last:null,pick:null,pb:null,cols:null,ring:null};
 function emReset(){EM.sel=null;EM.bd=null;EM.selN=0;EM.selBB=null;EM.drag=null;EM.pvOn=false;EM.on=false;EM.stack=[];EM.redo=[];EM.pb=null;EM.stroking=false;EM.last=null;EM.pick=null}
 function emGfx(){if(EM.cols)return;EM.cols=[new THREE.Color(0xff6a3d),new THREE.Color(0x3da5ff)];EM.sc={sel:new THREE.Color(0x37d4ff),bd:new THREE.Color(0xffffff),add:new THREE.Color(0xb6ff3d),sub:new THREE.Color(0xff4d4d)};const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(49*3),3));EM.ring=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff6a3d,depthTest:false,transparent:true}));EM.ring.frustumCulled=false;EM.ring.renderOrder=10;EM.ring.visible=false;MV.sc.add(EM.ring)}
 function mvRay(cx,cy){const r=MV.cv.getBoundingClientRect(),nx=(cx-r.left)/r.width*2-1,ny=-((cy-r.top)/r.height*2-1);mvCam();MV.cam.updateMatrixWorld();const o=MV.cam.position,v=new THREE.Vector3(nx,ny,.5).unproject(MV.cam).sub(o).normalize();return{o:{x:o.x,y:o.y,z:o.z},v:{x:v.x,y:v.y,z:v.z}}}
@@ -778,7 +869,7 @@ function emRestoreSnapshot(t,snap,isRedo){
     if(!G.history)G.history=[];G.history.push(histItem);
    }else{G.funds+=snap.cost;tApplyPatch(t,snap.pt,false);if(G.history)G.history=G.history.filter(h=>h.id!==snap.histId)}
    emSave(t);if(!saveGame(true))throw new Error("save failed");
-   mvEditRefresh(t,snap.pt.bb,true);upd();return true;
+   mvEditRefresh(t,snap.pt.bb,true);mvCourseRefresh();upd();return true;
   }catch(e){
    try{emRestorePersistState(t,before)}catch(restoreError){console.error("Undo/Redo rollback failed",restoreError)}
    try{mvEditRefresh(t,snap.pt.bb,true);upd()}catch(_){}
@@ -878,7 +969,7 @@ function emCommit(){
   G.history.push({id:commitSnap.histId,name:commitSnap.name,area:commitSnap.area,vol:commitSnap.vol,rockArea:commitSnap.rockArea,treeArea:commitSnap.treeArea,cost:commitSnap.cost,startDate:commitSnap.startDate,endDate:commitSnap.endDate,state:"完了"});
   emSave(t);if(!saveGame(true))throw new Error("save failed");
   EM.stack.push(commitSnap);if(EM.stack.length>30)EM.stack.shift();EM.redo=[];
-  mvEditRefresh(t,bb,true);emRefresh();upd();toast("地形造成工事が完了しました");
+  mvEditRefresh(t,bb,true);mvCourseRefresh();emRefresh();upd();toast("地形造成工事が完了しました");
  }catch(e){
   try{emRestorePersistState(t,before)}catch(restoreError){console.error("Commit rollback failed",restoreError)}
   EM.pb=null;EM.pvOn=false;EM.stroking=false;EM.last=null;
@@ -1074,13 +1165,13 @@ function mountMap(){
  if(!mvInit()){MV.box=null;box.innerHTML=`<div class="mfb"><b style="color:var(--tx)">3Dマップを表示できません</b><span>${E(MV.err||'WebGL非対応')}</span></div>`;return}
  try{
   const t=getTerrain(G);if(MV.t!==t)mvBuild(t); mvColor(G.wx?G.wx.depth:0);
-  box.appendChild(MV.cv);box.insertAdjacentHTML('beforeend',hud());if(EM.on){box.insertAdjacentHTML('beforeend',emPanel());emRefresh()}
+  box.appendChild(MV.cv);box.insertAdjacentHTML('beforeend',hud());if(CS.on){box.insertAdjacentHTML('beforeend',coursePanel());courseRefreshPanel()}if(EM.on){box.insertAdjacentHTML('beforeend',emPanel());emRefresh()}
   MV.box=box;mvTheme();mvResize();if(!MV.fit){MV.fit=1;mvFit()}
   if(window.ResizeObserver){if(MV.ro)MV.ro.disconnect();MV.ro=new ResizeObserver(mvResize);MV.ro.observe(box)} mvDraw();
  }catch(e){console.error(e);MV.box=null;box.innerHTML=`<div class="mfb"><b style="color:var(--tx)">3Dマップの描画に失敗しました</b><span>${E(String(e&&e.message||e))}</span></div>`}}
 
 const _at=applyTheme;applyTheme=function(){_at();mvTheme()};
-document.addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b||!MV.ok)return;const a=b.dataset.m;if(a==='in')mvZoom(.8);else if(a==='out')mvZoom(1.25);else if(a==='reset')mvReset();else if(a==='edit')emToggle()});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b||!MV.ok)return;const a=b.dataset.m;if(a==='in')mvZoom(.8);else if(a==='out')mvZoom(1.25);else if(a==='reset')mvReset();else if(a==='edit')emToggle();else if(a==='courses')courseToggle()});
 window.addEventListener('resize',()=>{layoutVars();mvResize()});
 
 /* ---- modal ---- */
@@ -1104,7 +1195,7 @@ document.addEventListener("click",ev=>{
   case"diff":N.diff=v;rNew();break;
   case"rival":N.rival=v==="1";rNew();break;
   case"start":{const nm=N.name.trim();if(!nm){chkName();return}
-   G={ver:3,name:nm,region:N.region,mountain:N.mt,diff:N.diff,rival:N.rival,funds:DIFF[N.diff].funds,date:"2026-11-01",day:1,phase:"開業準備中",reputation:50};G.wx=initWx(G);G.map=initMap(G);
+   G={ver:4,name:nm,region:N.region,mountain:N.mt,diff:N.diff,rival:N.rival,funds:DIFF[N.diff].funds,date:"2026-11-01",day:1,phase:"開業準備中",reputation:50};G.wx=initWx(G);G.map=initMap(G);G.map.courses=[];
    saveGame(true);enterGame();toast("開発を開始しました");break}
   case"cont":{const r=loadGame();if(r.err){$("#tn").textContent=r.err;toast(r.err);break}G=r.data;enterGame();toast(r.note||"ロードしました");break}
   case"set":rSet();break;
