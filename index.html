@@ -849,7 +849,7 @@ function emCalcCost(t, bb) {
   }
  }
  if (n === 0) return {n:0, cost:0};
- const U_DIG = 20, U_FILL = 30, U_AREA = 15, U_ROCK = 30, U_TREE = 15;
+ const U_DIG = 1, U_FILL = 1.5, U_AREA = 0.75, U_ROCK = 1.5, U_TREE = 0.75;
  const cost = Math.floor(digVol * U_DIG + fillVol * U_FILL + area * U_AREA + rockArea * U_ROCK + treeArea * U_TREE);
  return {n, mx, area, digVol, fillVol, rockArea, treeArea, cost};
 }
